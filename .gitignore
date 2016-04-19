@@ -1,0 +1,41 @@
+# Generated files
+*.ck
+/tmp/*.log.*
+/proxy/sndcmd
+/proxy/proxy
+
+# Temporary
+*~
+.Trash-*
+
+# C++
+*.o
+*.out
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Java
+*.class
+
+# LaTeX
+*.gz
+*.aux
+*.dvi
+*.log
+*.blg
+*.bbl
+*.toc
+*.lof
+*.lot
+*.out
+*.nav
+*.snm
+
+# VMs
+*.qcow2
+*.sav
+*.vdmk
+*.vdi
