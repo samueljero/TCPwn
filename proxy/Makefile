@@ -6,8 +6,8 @@ CC=gcc
 CPPFLAGS=-O2 -Wall -Werror -g
 
 BINARIES=proxy sndcmd
-PROXY_HEADERS=proxy.h control.h csv.h args.h iface.h
-PROXY_SRC=proxy.cc control.cc args.cc csv.cc attacker.cc iface.cc
+PROXY_HEADERS=proxy.h control.h csv.h args.h iface.h checksums.h
+PROXY_SRC=proxy.cc control.cc args.cc csv.cc attacker.cc iface.cc checksums.c
 SNDCMD_SRC=sndcmd.cc
 
 

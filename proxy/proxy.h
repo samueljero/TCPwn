@@ -23,6 +23,7 @@ class Message{
 	public:
 		char *buff;
 		int len;
+		int alloc;
 };
 
 enum direction {
@@ -36,7 +37,11 @@ class Iface;
 class pkt_info {
 	public:
 		Message msg;
+		Message cur;
 		enum direction dir;
+		int ip_type;
+		char *ip_src;
+		char *ip_dst;
 		Iface *rcv;
 		Iface *snd;
 };

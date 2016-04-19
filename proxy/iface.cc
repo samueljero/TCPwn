@@ -167,6 +167,10 @@ void Iface::rcv_run()
 		pk.dir = this->dir;
 		pk.rcv = this;
 		pk.snd = this->other;
+		pk.cur = pk.msg;
+		pk.ip_type = 0;
+		pk.ip_src = NULL;
+		pk.ip_dst = NULL;
 		pk = Attacker::get().doAttack(pk);
 
 		if (pk.msg.buff == NULL) {
@@ -181,8 +185,7 @@ void Iface::rcv_run()
 		}
 
 		free(pk.msg.buff);
-		pk.msg.buff = NULL;
-		pk.msg.len = 0;
+		memset(&pk,0,sizeof(pkt_info));
 	}
 }
 
@@ -191,8 +194,9 @@ Message Iface::recvMsg()
 {
 	Message m;
 
-	m.len = 1600;
-	m.buff =(char*) malloc(m.len);
+	m.alloc = 1600;
+	m.len = 0;
+	m.buff =(char*) malloc(m.alloc);
 	if (m.buff == NULL) {
 		m.len = 0;
 		return m;

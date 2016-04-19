@@ -5,10 +5,14 @@
 #include "attacker.h"
 #include "csv.h"
 #include "args.h"
+#include "checksums.h"
 #include <stdarg.h>
 #include <time.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
+#include <netinet/if_ether.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <map>
 #include <list>
 #include <vector>
@@ -102,9 +106,113 @@ pkt_info Attacker::doAttack(pkt_info pk)
 		print(pk);
 	}
 
-	//pk = applyActions(pk, it4);
+	pk = parseEthernet(pk);
 
 	pthread_rwlock_unlock(&lock);
+	return pk;
+}
+
+pkt_info Attacker::parseEthernet(pkt_info pk)
+{
+	struct ether_header *eth;
+
+	if (pk.msg.len < (int)sizeof(struct ether_header)) { //Check packet length
+		return pk;
+	}
+	eth = (struct ether_header*)pk.cur.buff;
+	switch (ntohs(eth->ether_type)) {
+		case ETHERTYPE_IP:
+			pk.cur.buff = pk.cur.buff + sizeof(struct ether_header);
+			pk.cur.len = pk.cur.len - sizeof(struct ether_header);
+			pk = parseIPv4(pk);
+			break;
+		case ETHERTYPE_IPV6:
+		case ETHERTYPE_VLAN:
+		default:
+			return pk;
+	}
+
+	return pk;
+}
+
+pkt_info Attacker::parseIPv4(pkt_info pk)
+{
+	struct iphdr *ip;
+	char *save;
+
+	if (pk.cur.len < (int) sizeof(struct iphdr)) { //Check packet length
+		return pk;
+	}
+
+	save = pk.cur.buff;
+	ip = (struct iphdr*)pk.cur.buff;
+	if (ip->version != 4) { //Check IP version
+		return pk;
+	}
+	if (ip->ihl*4 > pk.cur.len) { //Check claimed header length
+		return pk;
+	}
+
+	pk.cur.buff = pk.cur.buff + ip->ihl*4;
+	pk.cur.len = pk.cur.len - ip->ihl*4;
+	pk.ip_type = 4;
+	pk.ip_src = (char*) &ip->saddr;
+	pk.ip_dst = (char*) &ip->daddr;
+
+	switch(ip->protocol) {
+		case 6: //TCP
+			//pk=
+			break;
+		default:
+			return pk;
+	}
+
+	/* Update packet length */
+	pk.cur.len += ip->ihl*4;
+	pk.cur.buff = save;
+
+	/*Adjust IPv4 header to account for packet's total length*/
+	ip->tot_len=htons(pk.cur.len + ip->ihl*4);
+
+	/* Compute IPv4 Checksum */
+	ip->check = 0;
+	ip->check = ipv4_chksum((u_char*)save, ip->ihl*4);
+
+	return pk;
+}
+
+pkt_info Attacker::parseIPv6(pkt_info pk)
+{
+	struct ip6_hdr *ip;
+	char *save;
+
+	if (pk.cur.len < (int) sizeof(struct ip6_hdr)) { //Check packet length
+		return pk;
+	}
+
+	save = pk.cur.buff;
+	ip = (struct ip6_hdr*) pk.cur.buff;
+	if((ntohl(ip->ip6_ctlun.ip6_un1.ip6_un1_flow) & (0xF0000000)) != (60000000)){ //Check IP version
+		return pk;
+	}
+
+	pk.cur.buff = pk.cur.buff + sizeof(struct ip6_hdr);
+	pk.cur.len  = pk.cur.len - sizeof(struct ip6_hdr);
+	pk.ip_type = 6;
+	pk.ip_src = (char*) &ip->ip6_src;
+	pk.ip_dst = (char*) &ip->ip6_dst;
+
+	switch(ip->ip6_ctlun.ip6_un1.ip6_un1_nxt) {
+		case 6: //TCP
+		default:
+			return pk;
+	}
+
+	/* Adjust IPv6 header length */
+	ip->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(pk.cur.len);
+
+	pk.cur.len += sizeof(struct ip6_hdr);
+	pk.cur.buff = save;
 	return pk;
 }
 

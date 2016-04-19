@@ -30,7 +30,12 @@ class Attacker{
 		bool stop();
 
 	private:
+		pkt_info parseEthernet(pkt_info pk);
+		pkt_info parseIPv4(pkt_info pk);
+		pkt_info parseIPv6(pkt_info pk);
+		pkt_info parseVlan(pkt_info pk);
 		int normalize_action_type(char *s);
+
 		void print(pkt_info pk);
 		
 		pthread_rwlock_t lock;
