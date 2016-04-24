@@ -26,14 +26,15 @@ class Attacker{
 		static Attacker& get();
 		bool addCommand(Message m, Message *resp);
 		pkt_info doAttack(pkt_info pk);
+		pkt_info fixupAndSend(pkt_info pk, Message ip_payload, bool dosend);
 		bool start();
 		bool stop();
 
 	private:
-		pkt_info parseEthernet(pkt_info pk);
-		pkt_info parseIPv4(pkt_info pk);
-		pkt_info parseIPv6(pkt_info pk);
-		pkt_info parseVlan(pkt_info pk);
+		pkt_info parseEthernet(pkt_info pk, Message cur);
+		Message fixupEthernet(Message cur, Message ip_payload);
+		pkt_info parseIPv4(pkt_info pk, Message cur);
+		Message fixupIPv4(Message cur, Message ip_payload);
 		int normalize_action_type(char *s);
 
 		void print(pkt_info pk);

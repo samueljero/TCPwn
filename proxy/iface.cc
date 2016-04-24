@@ -164,15 +164,21 @@ void Iface::rcv_run()
 			break;
 		}
 
+		pk.valid = true;
 		pk.dir = this->dir;
 		pk.rcv = this;
 		pk.snd = this->other;
-		pk.cur = pk.msg;
 		pk.ip_type = 0;
 		pk.ip_src = NULL;
 		pk.ip_dst = NULL;
+		pk.mac_src = NULL;
+		pk.mac_dst = NULL;
 		pk = Attacker::get().doAttack(pk);
 
+		if (!pk.valid) {
+			/* No message to send */
+			continue;
+		}
 		if (pk.msg.buff == NULL) {
 			/* No message to send */
 			continue;

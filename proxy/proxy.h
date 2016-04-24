@@ -36,12 +36,14 @@ class Iface;
 
 class pkt_info {
 	public:
+		bool valid;
 		Message msg;
-		Message cur;
 		enum direction dir;
 		int ip_type;
 		char *ip_src;
 		char *ip_dst;
+		char *mac_src;
+		char *mac_dst;
 		Iface *rcv;
 		Iface *snd;
 };

@@ -3,6 +3,7 @@
 * TCP Congestion Control Proxy: Malicious Processing
 ******************************************************************************/
 #include "attacker.h"
+#include "iface.h"
 #include "csv.h"
 #include "args.h"
 #include "checksums.h"
@@ -100,31 +101,66 @@ int Attacker::normalize_action_type(char *s)
 
 pkt_info Attacker::doAttack(pkt_info pk)
 {
+	Message m;
+
 	pthread_rwlock_rdlock(&lock);
 
 	if (proxy_debug > 2) {
 		print(pk);
 	}
 
-	pk = parseEthernet(pk);
+	m = pk.msg;
+	pk = parseEthernet(pk, m);
 
 	pthread_rwlock_unlock(&lock);
 	return pk;
 }
 
-pkt_info Attacker::parseEthernet(pkt_info pk)
+pkt_info Attacker::fixupAndSend(pkt_info pk, Message ip_payload, bool dosend)
 {
-	struct ether_header *eth;
+	Message m;
 
-	if (pk.msg.len < (int)sizeof(struct ether_header)) { //Check packet length
+	if (!pk.valid || !pk.msg.buff) {
+		dbgprintf(0, "Error: Trying to send invalid packet\n");
+	}
+
+	m = fixupEthernet(pk.msg,ip_payload);
+	
+	if (m.buff != pk.msg.buff || m.len > pk.msg.alloc || !pk.snd) {
+		dbgprintf(0, "Error: Trying to send invalid packet\n");
+		pk.valid = false;
+		pk.msg.buff = NULL;
 		return pk;
 	}
-	eth = (struct ether_header*)pk.cur.buff;
+	pk.msg = m;
+
+	if (dosend) {
+		pk.snd->sendm(pk.msg);
+	}
+	return pk;
+}
+
+pkt_info Attacker::parseEthernet(pkt_info pk, Message cur)
+{
+	struct ether_header *eth;
+	Message m;
+
+	/* Check packet length */
+	if (pk.msg.len < (int)sizeof(struct ether_header)) {
+		return pk;
+	}
+	if (cur.len < (int)sizeof(struct ether_header)) {
+		return pk;
+	}
+	eth = (struct ether_header*)cur.buff;
+	pk.mac_src = (char*) &eth->ether_shost;
+	pk.mac_dst = (char*) &eth->ether_dhost;
+
 	switch (ntohs(eth->ether_type)) {
 		case ETHERTYPE_IP:
-			pk.cur.buff = pk.cur.buff + sizeof(struct ether_header);
-			pk.cur.len = pk.cur.len - sizeof(struct ether_header);
-			pk = parseIPv4(pk);
+			m.buff = cur.buff + sizeof(struct ether_header);
+			m.len = cur.len - sizeof(struct ether_header);
+			pk = parseIPv4(pk, m);
 			break;
 		case ETHERTYPE_IPV6:
 		case ETHERTYPE_VLAN:
@@ -135,26 +171,61 @@ pkt_info Attacker::parseEthernet(pkt_info pk)
 	return pk;
 }
 
-pkt_info Attacker::parseIPv4(pkt_info pk)
+Message Attacker::fixupEthernet(Message cur, Message ip_payload)
+{
+	struct ether_header *eth;
+	Message m;
+
+	/* Check packet length */
+	if (cur.len < (int)sizeof(struct ether_header)) {
+			m.buff = NULL;
+			m.len = m.alloc = 0;
+			return m;
+	}
+
+	eth = (struct ether_header*)cur.buff;
+	switch (ntohs(eth->ether_type)) {
+		case ETHERTYPE_IP:
+			m.buff = cur.buff + sizeof(struct ether_header);
+			m.len = cur.len - sizeof(struct ether_header);
+			m = fixupIPv4(m, ip_payload);
+			break;
+		case ETHERTYPE_IPV6:
+		case ETHERTYPE_VLAN:
+		default:
+			m.buff = NULL;
+			m.len = m.alloc = 0;
+			return m;
+	}
+
+	/* Fixup buffer lengths */
+	m.buff = cur.buff;
+	m.len = m.len + sizeof(struct ether_header);
+	return m;
+}
+
+pkt_info Attacker::parseIPv4(pkt_info pk, Message cur)
 {
 	struct iphdr *ip;
-	char *save;
+	Message m;
 
-	if (pk.cur.len < (int) sizeof(struct iphdr)) { //Check packet length
+	/* Check packet length */
+	if (cur.len < (int) sizeof(struct iphdr)) {
 		return pk;
 	}
 
-	save = pk.cur.buff;
-	ip = (struct iphdr*)pk.cur.buff;
-	if (ip->version != 4) { //Check IP version
+	ip = (struct iphdr*)cur.buff;
+	/* Check IP version */
+	if (ip->version != 4) {
 		return pk;
 	}
-	if (ip->ihl*4 > pk.cur.len) { //Check claimed header length
+	/* Check claimed header length */
+	if (ip->ihl*4 > cur.len) {
 		return pk;
 	}
 
-	pk.cur.buff = pk.cur.buff + ip->ihl*4;
-	pk.cur.len = pk.cur.len - ip->ihl*4;
+	m.buff = cur.buff + ip->ihl*4;
+	m.len = cur.len - ip->ihl*4;
 	pk.ip_type = 4;
 	pk.ip_src = (char*) &ip->saddr;
 	pk.ip_dst = (char*) &ip->daddr;
@@ -166,54 +237,55 @@ pkt_info Attacker::parseIPv4(pkt_info pk)
 		default:
 			return pk;
 	}
-
-	/* Update packet length */
-	pk.cur.len += ip->ihl*4;
-	pk.cur.buff = save;
-
-	/*Adjust IPv4 header to account for packet's total length*/
-	ip->tot_len=htons(pk.cur.len + ip->ihl*4);
-
-	/* Compute IPv4 Checksum */
-	ip->check = 0;
-	ip->check = ipv4_chksum((u_char*)save, ip->ihl*4);
-
 	return pk;
 }
 
-pkt_info Attacker::parseIPv6(pkt_info pk)
+Message Attacker::fixupIPv4(Message cur, Message ip_payload)
 {
-	struct ip6_hdr *ip;
-	char *save;
+	struct iphdr *ip;
+	Message m;
 
-	if (pk.cur.len < (int) sizeof(struct ip6_hdr)) { //Check packet length
-		return pk;
+	/* Check packet length*/
+	if (cur.len < (int) sizeof(struct iphdr)) {
+		m.buff = NULL;
+		m.len = m.alloc = 0;
+		return m;
 	}
 
-	save = pk.cur.buff;
-	ip = (struct ip6_hdr*) pk.cur.buff;
-	if((ntohl(ip->ip6_ctlun.ip6_un1.ip6_un1_flow) & (0xF0000000)) != (60000000)){ //Check IP version
-		return pk;
+	ip = (struct iphdr*)cur.buff;
+	/* Check IP version */
+	if (ip->version != 4) {
+		m.buff = NULL;
+		m.len = m.alloc = 0;
+		return m;
+	}
+	/* Check claimed header length */
+	if (ip->ihl*4 > cur.len) {
+		m.buff = NULL;
+		m.len = m.alloc = 0;
+		return m;
 	}
 
-	pk.cur.buff = pk.cur.buff + sizeof(struct ip6_hdr);
-	pk.cur.len  = pk.cur.len - sizeof(struct ip6_hdr);
-	pk.ip_type = 6;
-	pk.ip_src = (char*) &ip->ip6_src;
-	pk.ip_dst = (char*) &ip->ip6_dst;
-
-	switch(ip->ip6_ctlun.ip6_un1.ip6_un1_nxt) {
-		case 6: //TCP
-		default:
-			return pk;
+	m.buff = cur.buff + ip->ihl*4;
+	m.len = cur.len - ip->ihl*4;
+	/* Check that IP payload starts where it should */
+	if (m.buff != ip_payload.buff) {
+		m.buff = NULL;
+		m.len = m.alloc = 0;
+		return m;
 	}
 
-	/* Adjust IPv6 header length */
-	ip->ip6_ctlun.ip6_un1.ip6_un1_plen = htons(pk.cur.len);
+	/* Update packet length */
+	cur.len = ip_payload.len + ip->ihl*4;
 
-	pk.cur.len += sizeof(struct ip6_hdr);
-	pk.cur.buff = save;
-	return pk;
+	/*Adjust IPv4 header to account for packet's total length*/
+	ip->tot_len=htons(ip_payload.len + ip->ihl*4);
+
+	/* Compute IPv4 Checksum */
+	ip->check = 0;
+	ip->check = ipv4_chksum((u_char*)cur.buff, ip->ihl*4);
+
+	return cur;
 }
 
 void Attacker::print(pkt_info pk)
