@@ -12,17 +12,20 @@ class inject_info {
 	char* mac_dst;
 	char* ip_src;
 	char* ip_dst;
-	int tcp_src;
-	int tcp_dst;
+	int port_src;
+	int port_dst;
 	int type;
 	int window;
 	unsigned long seq;
 	unsigned long ack;
 	int freq;
-}
+	int method;
+	enum direction dir;
+};
 
 class Proto {
 	public:
+		virtual ~Proto() {}
 		virtual pkt_info new_packet(pkt_info pk, Message hdr) = 0;
 		virtual bool SetInject(unsigned long start, unsigned long stop, inject_info &info) = 0;
 		virtual bool SetDivision(unsigned long start, unsigned long stop, int bytes_per_chunk) = 0;
@@ -30,6 +33,8 @@ class Proto {
 		virtual bool SetPreAck(unsigned long start, unsigned long stop, int amt) = 0;
 		virtual bool SetRenege(unsigned long start, unsigned long stop, int amt, int growth) = 0;
 		virtual bool SetBurst(unsigned long start, unsigned long stop, int num) = 0;
+		virtual bool Clear() = 0;
+		virtual bool SetPrint(bool on) = 0;
 };
 
 #endif

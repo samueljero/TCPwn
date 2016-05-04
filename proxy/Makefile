@@ -3,11 +3,11 @@
 ###############################################################################
 CPP=g++
 CC=gcc
-CPPFLAGS=-O2 -Wall -Werror -g
+CPPFLAGS=-O2 -Wall -Werror -Wextra -Wpedantic -g
 
 BINARIES=proxy sndcmd
 PROXY_HEADERS=proxy.h control.h csv.h args.h iface.h checksums.h
-PROXY_SRC=proxy.cc control.cc args.cc csv.cc attacker.cc iface.cc checksums.c
+PROXY_SRC=proxy.cc control.cc args.cc csv.cc attacker.cc iface.cc checksums.c tcp.cc
 SNDCMD_SRC=sndcmd.cc
 
 

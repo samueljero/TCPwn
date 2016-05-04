@@ -27,9 +27,9 @@ class Message{
 };
 
 enum direction {
-	NONE,
-	FORWARD,
-    BACKWARD,
+	NONE = 0,
+	FORWARD = 1,
+    BACKWARD = 2
 };
 
 class Iface;

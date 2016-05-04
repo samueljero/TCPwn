@@ -1,12 +1,16 @@
 /******************************************************************************
 * Author: Samuel Jero <sjero@purdue.edu> and Xiangyu Bu <xb@purdue.edu>
 * TCP Congestion Control Proxy: Malicious Processing
+*
+* Rule Format:
+* src_ip,dst_ip,proto,start,stop,action,parms
 ******************************************************************************/
 #include "attacker.h"
 #include "iface.h"
 #include "csv.h"
 #include "args.h"
 #include "checksums.h"
+#include "tcp.h"
 #include <stdarg.h>
 #include <time.h>
 #include <sys/time.h>
@@ -18,10 +22,28 @@
 #include <list>
 #include <vector>
 #include <string>
+#include <climits>
 using namespace std;
 
 #define ATTACKER_ROW_NUM_FIELDS		7
 #define ATTACKER_ARGS_DELIM		'&'
+
+#define ACTION_ALIAS_INJECT 	"INJECT"
+#define ACTION_ALIAS_DIV 		"DIV"
+#define ACTION_ALIAS_DUP		"DUP"
+#define ACTION_ALIAS_PREACK		"PREACK"
+#define ACTION_ALIAS_RENEGE		"RENEGE"
+#define ACTION_ALIAS_BURST		"BURST"
+#define ACTION_ALIAS_PRINT		"PRINT"
+#define ACTION_ALIAS_CLEAR		"CLEAR"
+
+#define PROTO_ALIAS_TCP			"TCP"
+
+#define METHOD_ALIAS_ABS		"ABS"
+
+#define IP_WILDCARD 0
+
+#define TIME_ERROR ULONG_MAX
 
 #define PKT_TYPES_STR_LEN		5000
 
@@ -47,17 +69,26 @@ bool Attacker::addCommand(Message m, Message *resp)
 	bool ret = true;
 	size_t num_fields;
 	int action_type;
+	int proto;
+	unsigned long start;
+	unsigned long stop;
+	uint32_t ip_src;
+	uint32_t ip_dst;
 	char **fields;
 	arg_node_t *args;
+	Proto *obj;
+	arg_node_t *targ;
+	int amt;
+	inject_info info;
 
 	dbgprintf(2, "Received CMD: %s\n", m.buff);
 
 	/* Parse CSV */
 	fields = csv_parse(m.buff, m.len, &num_fields);
-	for (size_t i = 0; i < num_fields; ++i) {
+	/*for (size_t i = 0; i < num_fields; ++i) {
 		csv_unescape(fields[i]);
 		fprintf(stderr, "%lu: \"%s\"\n", i, fields[i]);
-	}
+	}*/
 
 	if (num_fields != ATTACKER_ROW_NUM_FIELDS) {
 		dbgprintf(0,"Adding Command: csv field count mismatch (%lu / %d).\n", num_fields, ATTACKER_ROW_NUM_FIELDS);
@@ -65,8 +96,39 @@ bool Attacker::addCommand(Message m, Message *resp)
 		goto out;
 	}
 
+	ip_src = normalize_addr(fields[0]);
+	ip_dst = normalize_addr(fields[1]);
+
+	if ((proto = normalize_proto(fields[2])) == PROTO_ID_ERR) {
+		dbgprintf(0,"Adding Command: unsupported protocol \"%s\".\n", fields[3]);
+		ret = false;
+		goto out;
+	}
+
+	if ((start = normalize_time(fields[3])) == TIME_ERROR) {
+		dbgprintf(0,"Adding Command: invalid start time \"%s\".\n", fields[4]);
+		ret = false;
+		goto out;
+	}
+
+	if ((stop = normalize_time(fields[4])) == TIME_ERROR) {
+		dbgprintf(0,"Adding Command: invalid end time \"%s\".\n", fields[4]);
+		ret = false;
+		goto out;
+	}
+	if ( stop != 0 && stop < start) {
+		dbgprintf(0,"Adding Command: end time before start time.\n");
+		ret = false;
+		goto out;
+	}
+
 	if ((action_type = normalize_action_type(fields[5])) == ACTION_ID_ERR) {
 		dbgprintf(0,"Adding Command: unsupported malicious action \"%s\".\n", fields[5]);
+		ret = false;
+		goto out;
+	}
+	if (action_type != ACTION_ID_CLEAR && (ip_src == IP_WILDCARD || ip_dst == IP_WILDCARD)) {
+		dbgprintf(0,"Adding Command: bad addresses \"%s\", \"%s\"\n", fields[0],fields[1]);
 		ret = false;
 		goto out;
 	}
@@ -78,12 +140,272 @@ bool Attacker::addCommand(Message m, Message *resp)
 		goto out;
 	}
 
-	//Actually load stuff
+	/*take lock */
+	pthread_rwlock_wrlock(&lock);
+
+	/* Clear ALL rules and state */
+	if (ip_src == IP_WILDCARD && ip_dst == IP_WILDCARD && action_type == ACTION_ID_CLEAR) {
+		clear_connections();
+		goto unlock;
+	}
+
+	/* Find or create object for this connection */
+	if ((obj = find_or_create_proto(ip_src,ip_dst,proto)) == NULL) {
+		dbgprintf(0,"Adding Command: failed to find/create object for connection");
+		ret = false;
+		goto unlock;
+	}
+
+	/* Process this action for this connection */
+	switch(action_type) {
+		case ACTION_ID_INJECT:
+			memset(&info,0,sizeof(inject_info));
+
+			targ = args_find(args, "mac_src");
+			if (targ) {
+				info.mac_src = targ->value.s;
+			}
+
+			targ = args_find(args, "mac_dst");
+			if (targ) {
+				info.mac_dst = targ->value.s;
+			}
+
+			info.ip_src = fields[0];
+			info.ip_dst = fields[1];
+
+			targ = args_find(args, "src_port");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				info.port_src = targ->value.i;
+			}
+
+			targ = args_find(args, "dst_port");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				info.port_dst = targ->value.i;
+			}
+
+			targ = args_find(args, "type");
+			if (targ && targ-> type == ARG_VALUE_TYPE_INT) {
+				info.type = targ->value.i;
+			}
+
+			targ = args_find(args, "win");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				info.window = targ->value.i;
+			}
+
+			targ = args_find(args, "seq");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				info.seq = targ->value.i;
+			}
+
+			targ = args_find(args, "ack");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				info.ack = targ->value.i;
+			}
+
+			targ = args_find(args, "freq");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				info.freq = targ->value.i;
+			}
+
+			targ = args_find(args, "dir");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				if (targ->value.i == 1) {
+					info.dir = FORWARD;
+				} else if (targ->value.i == 2) {
+					info.dir = BACKWARD;
+				} else {
+					dbgprintf(0, "Adding INJECT Command: failed with bad arguments---invalid direction\n");
+				}
+			} else {
+					dbgprintf(0, "Adding INJECT Command: failed with bad arguments---invalid direction\n");
+			}
+
+			targ = args_find(args, "method");
+			if (targ) {
+				info.method = normalize_method(targ->value.s);
+			}
+
+			if (start == 0 && ( !info.mac_src || !info.mac_dst ||
+				info.port_src == 0 || info.port_dst == 0)) {
+				dbgprintf(0, "Adding INJECT Command: failed with bad arguments---start is zero and no addresses\n");
+				ret = false;
+			} else {
+				ret = obj->SetInject(start,stop,info);
+			}
+			break;
+		case ACTION_ID_DIV:
+			targ = args_find(args, "bpc");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				ret = obj->SetDivision(start,stop, targ->value.i);
+			} else {
+				dbgprintf(0, "Adding DIV Command: failed with bad arguments (missing bpc tag)\n");
+				ret = false;
+			}
+			break;
+		case ACTION_ID_DUP:
+			targ = args_find(args, "num");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				ret = obj->SetDup(start,stop,targ->value.i);
+			} else {
+				dbgprintf(0, "Adding DUP Command: failed with bad arguments (missing num tag)\n");
+				ret = false;
+			}
+			break;
+		case ACTION_ID_PREACK:
+			targ = args_find(args, "amt");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				ret = obj->SetPreAck(start,stop,targ->value.i);
+			} else {
+				dbgprintf(0, "Adding PREACK Command: failed with bad arguments (missing amt tag)\n");
+				ret = false;
+			}
+			break;
+		case ACTION_ID_RENEGE:
+			targ = args_find(args,"amt");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				amt = targ->value.i;
+				targ = args_find(args, "growth");
+				if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+					ret = obj->SetRenege(start,stop,amt,targ->value.i);
+				} else {
+					dbgprintf(0, "Adding RENEGE Command: failed with bad arguments (missing growth tag)\n");
+					ret = false;
+				}
+			} else {
+				dbgprintf(0, "Adding RENEGE Command: failed with bad arguments (missing amt tag)\n");
+				ret = false;
+			}
+			break;
+		case ACTION_ID_BURST:
+			targ = args_find(args,"num");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				ret = obj->SetBurst(start,stop,targ->value.i);
+			} else {
+				dbgprintf(0, "Adding BURST Command: failed with bad arguments (missing num tag)\n");
+				ret = false;
+			}
+			break;
+		case ACTION_ID_PRINT:
+			targ = args_find(args, "on");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				ret = obj->SetPrint(targ->value.i);
+			} else {
+				dbgprintf(0, "Adding PRINT Command: failed with bad arguments (missing on tag)\n");
+				ret = false;
+			}
+			break;
+		case ACTION_ID_CLEAR:
+			obj->Clear();
+			break;
+	}
+
+	if (ret) {
+		dbgprintf(1, "New Rule Installed: %u -> %u (%i), %lu -> %lu, %i\n", ip_src, ip_dst, proto, start, stop, action_type);
+	}
+
+unlock:
+	/*release lock*/
+	pthread_rwlock_unlock(&lock);
+
+	/* No return messages*/
+	if (resp->buff != NULL) {
+		resp->buff = NULL;
+	}
 
 	args_free(args);
 out:
 	csv_free(fields);
 	return ret;
+}
+
+Proto* Attacker::find_or_create_proto(uint32_t src, uint32_t dst, int proto)
+{
+	map<uint32_t, map<uint32_t,Proto*> >::iterator it1;
+	Proto *obj = NULL;
+
+	obj = find_proto(src,dst);
+	if (obj) {
+		return obj;
+	}
+	obj = find_proto(dst,src);
+	if (obj) {
+		return obj;
+	}
+
+	obj = create_proto(src,dst,proto);
+
+	/* Insert forward */
+	it1 = connections.find(src);
+	if (it1 == connections.end()) {
+		connections[src] = map<uint32_t,Proto*>();
+		connections[src][dst] = obj;
+	} else {
+		connections[src][dst] = obj;
+	}
+
+	/* Insert backward */
+	it1 = connections.find(dst);
+	if (it1 == connections.end()) {
+		connections[dst] = map<uint32_t,Proto*>();
+		connections[dst][src] = obj;
+	} else {
+		connections[dst][src] = obj;
+	}
+
+	return obj;
+}
+
+Proto *Attacker::find_proto(uint32_t src, uint32_t dst)
+{
+	map<uint32_t, map<uint32_t,Proto*> >::iterator it1;
+	map<uint32_t,Proto* >::iterator it2;
+
+	it1 = connections.find(src);
+	if (it1 == connections.end()) {
+		return NULL;
+	}
+
+	it2 = it1->second.find(dst);
+	if (it2 == it1->second.end()) {
+		return NULL;
+	}
+
+	return it2->second;
+}
+
+Proto *Attacker::create_proto(uint32_t src, uint32_t dst, int proto)
+{
+	Proto * obj;
+	switch(proto) {
+		case PROTO_ID_TCP:
+			obj = new TCP(src,dst);
+			return obj;
+	}
+	return NULL;
+}
+
+bool Attacker::clear_connections()
+{
+	uint32_t src;
+	uint32_t dst;
+
+	while (connections.begin() != connections.end()) {
+		if (connections.begin()->second.begin() == connections.begin()->second.end()) {
+			connections.erase(connections.begin());
+		} else {
+			src = connections.begin()->first;
+			dst = connections.begin()->second.begin()->first;
+			if (connections.begin()->second.begin()->second) {
+				delete connections.begin()->second.begin()->second;
+				connections[dst][src] = NULL;
+			}
+			connections.begin()->second.erase(connections.begin()->second.begin());
+		}
+	}
+
+	return true;
 }
 
 int Attacker::normalize_action_type(char *s)
@@ -94,10 +416,80 @@ int Attacker::normalize_action_type(char *s)
 		if (ret < ACTION_ID_MIN || ret > ACTION_ID_MAX) return ACTION_ID_ERR;
 		return ret;
 	}
+	if (!strcmp(ACTION_ALIAS_INJECT,s)) return ACTION_ID_INJECT;
+	if (!strcmp(ACTION_ALIAS_DIV,s)) return ACTION_ID_DIV;
+	if (!strcmp(ACTION_ALIAS_DUP,s)) return ACTION_ID_DUP;
+	if (!strcmp(ACTION_ALIAS_PREACK,s)) return ACTION_ID_PREACK;
+	if (!strcmp(ACTION_ALIAS_RENEGE,s)) return ACTION_ID_RENEGE;
+	if (!strcmp(ACTION_ALIAS_BURST,s)) return ACTION_ID_BURST;
+	if (!strcmp(ACTION_ALIAS_PRINT,s)) return ACTION_ID_PRINT;
+	if (!strcmp(ACTION_ALIAS_CLEAR,s)) return ACTION_ID_CLEAR;
 	return ACTION_ID_ERR;
 }
 
+int Attacker::normalize_proto(char *s)
+{
+	int ret;
+	if (is_int(s)) {
+		ret = atoi(s);
+		if (ret < PROTO_ID_MIN || ret > PROTO_ID_MAX) return PROTO_ID_ERR;
+		return ret;
+	}
 
+	if (!strcmp(PROTO_ALIAS_TCP,s)) return PROTO_ID_TCP;
+	return PROTO_ID_ERR;
+}
+
+int Attacker::normalize_method(char *s)
+{
+	int ret;
+	if (is_int(s)) {
+		ret = atoi(s);
+		if (ret < METHOD_ID_MIN || ret > METHOD_ID_MAX) return METHOD_ID_ERR;
+		return ret;
+	}
+
+	if (!strcmp(METHOD_ALIAS_ABS,s)) return METHOD_ID_ABS;
+	return METHOD_ID_ERR;
+}
+
+uint32_t Attacker::normalize_addr(char *s)
+{
+	struct addrinfo hints;
+	struct addrinfo *results, *p;
+	uint32_t res;
+
+	if (s[0] == '*') {
+		return IP_WILDCARD;
+	}
+
+	/* Lookup IP/Hostname */
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_INET;
+	if (getaddrinfo(s, NULL, &hints, &results) < 0) {
+		return IP_WILDCARD;
+	}
+
+	for (p = results; p!=NULL; p = p->ai_next) {
+		memcpy(&res, p->ai_addr, sizeof(uint32_t));
+		return res;
+	}
+
+	return IP_WILDCARD;
+}
+
+unsigned long Attacker::normalize_time(char *s)
+{
+	unsigned long t;
+	char *end;
+
+	t = strtoul(s,&end,0);
+	if (end == s) {
+		return TIME_ERROR;
+	}
+
+	return t;
+}
 
 pkt_info Attacker::doAttack(pkt_info pk)
 {
@@ -232,7 +624,7 @@ pkt_info Attacker::parseIPv4(pkt_info pk, Message cur)
 
 	switch(ip->protocol) {
 		case 6: //TCP
-			//pk=
+			pk= check_connection(pk, m);
 			break;
 		default:
 			return pk;
@@ -286,6 +678,30 @@ Message Attacker::fixupIPv4(Message cur, Message ip_payload)
 	ip->check = ipv4_chksum((u_char*)cur.buff, ip->ihl*4);
 
 	return cur;
+}
+
+pkt_info Attacker::check_connection(pkt_info pk, Message cur)
+{
+	uint32_t src;
+	uint32_t dst;
+	map<uint32_t,map<uint32_t,Proto*> >::iterator it1;
+	map<uint32_t,Proto*>::iterator it2;
+
+	if (!pk.ip_src || !pk.ip_dst) {
+		return pk;
+	}
+	memcpy(&src, pk.ip_src, sizeof(src));
+	memcpy(&dst, pk.ip_dst, sizeof(dst));
+
+	it1 = connections.find(src);
+	if (it1 != connections.end()) {
+		it2 = it1->second.find(dst);
+		if (it2 != it1->second.end()) {
+			return it2->second->new_packet(pk,cur);
+		}
+	}
+
+	return pk;
 }
 
 void Attacker::print(pkt_info pk)
