@@ -45,6 +45,8 @@ class Attacker{
 		bool addCommand(Message m, Message *resp);
 		pkt_info doAttack(pkt_info pk);
 		pkt_info fixupAndSend(pkt_info pk, Message ip_payload, bool dosend);
+		uint32_t normalize_addr(char* s);
+		bool normalize_mac(char* str, char* raw);
 		bool start();
 		bool stop();
 
@@ -56,7 +58,6 @@ class Attacker{
 		pkt_info check_connection(pkt_info pk, Message cur);
 		int normalize_action_type(char *s);
 		int normalize_proto(char *s);
-		uint32_t normalize_addr(char* s);
 		unsigned long normalize_time(char *s);
 		int normalize_method(char *s);
 		Proto* find_or_create_proto(uint32_t src, uint32_t dst, int proto);
@@ -67,7 +68,8 @@ class Attacker{
 		void print(pkt_info pk);
 	
 		//src,dest,object
-		std::map<uint32_t,std::map<uint32_t,Proto*> > connections; 
+		std::map<uint32_t,std::map<uint32_t,Proto*> > connections;
+		int ipv4_id;
 		pthread_rwlock_t lock;
 };
 

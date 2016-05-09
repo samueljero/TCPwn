@@ -19,6 +19,8 @@ using namespace std;
 int proxy_debug = 1;
 
 list<Control*> controls;
+Iface* iface1;
+Iface* iface2;
 
 void version();
 void usage();
@@ -29,8 +31,6 @@ void cleanupControls();
 int main(int argc, char** argv)
 {
 	int ctlport = 3333;
-	Iface* iface1;
-	Iface* iface2;
 	vector<string> ifaces;
 
 	/*parse commandline options*/
@@ -94,6 +94,14 @@ int setup_ifaces(vector<string> ifaces)
 {
 	dbgprintf(1, "Iface 1: %s\n", ifaces[0].c_str());
 	return 0;
+}
+
+Iface *GetForwardInterface() {
+	return iface1;
+}
+
+Iface *GetBackwardInterface() {
+	return iface2;
 }
 
 void control_loop(int port)

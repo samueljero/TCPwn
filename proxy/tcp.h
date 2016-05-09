@@ -6,6 +6,8 @@
 
 #include "proto.h"
 #include <netinet/tcp.h>
+#include <list>
+#include <utility>
 
 
 class tcp_half {
@@ -13,6 +15,9 @@ class tcp_half {
 	uint32_t ip;
 	char mac[6];
 	uint16_t port;
+
+	bool have_initial_seq;
+	bool have_initial_ack;
 	
 	unsigned long initial_seq;
 	unsigned long initial_ack;
@@ -20,6 +25,30 @@ class tcp_half {
 	unsigned long high_ack;
 	unsigned long window;
 	unsigned long pkts;
+};
+
+class Injector {
+	public:
+		Injector(pkt_info pk, Message hdr, inject_info &info);
+		~Injector();
+		unsigned long GetStop() {return stop;}
+		bool Start();
+		bool Stop();
+
+	private:
+		static void* thread_run(void *arg);
+		void _run();
+		pthread_t thread;
+		bool running;
+		bool thread_running;
+		pkt_info pk;
+		Message ip_payload;
+		int method;
+		int freq;
+		enum direction dir;
+		unsigned long start;
+		unsigned long stop;
+		pthread_mutex_t timeout_mutex;
 };
 
 
@@ -40,6 +69,18 @@ class TCP: public Proto {
 	private:
 		pkt_info process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &dst);
 		void init_conn_info(pkt_info pk, struct tcphdr *tcph, tcp_half &src, tcp_half &dst);
+		bool in_pkt_range(unsigned long pkt, unsigned long start, unsigned long stop);
+		void update_conn_info(struct tcphdr *tcph, tcp_half &src);
+		pkt_info PerformPreAck(pkt_info pk, Message hdr, tcp_half &dst);
+		pkt_info PerformRenege(pkt_info pk, Message hdr);
+		pkt_info PerformDivision(pkt_info pk, Message hdr, tcp_half &old_src);
+		pkt_info PerformDup(pkt_info pk, Message hdr);
+		pkt_info PerformBurst(pkt_info pk, Message hdr);
+		bool BuildPacket(pkt_info &pk, Message &hdr, inject_info &info);
+		Message BuildEthHeader(Message pk, char* src, char* dst, int next);
+		Message BuildIPHeader(Message pk, uint32_t src, uint32_t dst, int next);
+		Message BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info &info, Message &ip_payload);
+		bool StartInjector(inject_info &info);
 
 		tcp_half fwd;
 		tcp_half rev;
@@ -67,7 +108,13 @@ class TCP: public Proto {
 		int preack_amt;
 		int renege_amt;
 		int renege_growth;
+		uint32_t renege_save;
 		int burst_num;
+		std::list<std::pair<pkt_info,Message> > burst_pkts;
+		std::list<inject_info> injections;
+		std::list<Injector*> active_injectors;
+
+		unsigned long total_pkts;
 };
 
 #endif

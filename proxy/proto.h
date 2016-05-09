@@ -6,12 +6,15 @@
 
 #include "proxy.h"
 
+#define MAC_MAX 20
+#define IP_MAX 50
+
 class inject_info {
 	public:
-	char* mac_src;
-	char* mac_dst;
-	char* ip_src;
-	char* ip_dst;
+	char mac_src[MAC_MAX];
+	char mac_dst[MAC_MAX];
+	char ip_src[IP_MAX];
+	char ip_dst[IP_MAX];
 	int port_src;
 	int port_dst;
 	int type;
@@ -21,6 +24,8 @@ class inject_info {
 	int freq;
 	int method;
 	enum direction dir;
+	unsigned long start;
+	unsigned long stop;
 };
 
 class Proto {

@@ -10,6 +10,7 @@
 #include "csv.h"
 #include "args.h"
 #include "checksums.h"
+#include "proto.h"
 #include "tcp.h"
 #include <stdarg.h>
 #include <time.h>
@@ -51,6 +52,7 @@ pthread_mutex_t ofo_print_serialization_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 Attacker::Attacker()
 {
+	ipv4_id = 42;
 	pthread_rwlock_init(&lock, NULL);
 }
 Attacker::~Attacker()
@@ -163,16 +165,16 @@ bool Attacker::addCommand(Message m, Message *resp)
 
 			targ = args_find(args, "mac_src");
 			if (targ) {
-				info.mac_src = targ->value.s;
+				strncpy(info.mac_src, targ->value.s, MAC_MAX);
 			}
 
 			targ = args_find(args, "mac_dst");
 			if (targ) {
-				info.mac_dst = targ->value.s;
+				strncpy(info.mac_dst, targ->value.s, MAC_MAX);
 			}
 
-			info.ip_src = fields[0];
-			info.ip_dst = fields[1];
+			strncpy(info.ip_src, fields[0], IP_MAX);
+			strncpy(info.ip_dst, fields[1], IP_MAX);
 
 			targ = args_find(args, "src_port");
 			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
@@ -478,6 +480,31 @@ uint32_t Attacker::normalize_addr(char *s)
 	return IP_WILDCARD;
 }
 
+bool Attacker::normalize_mac(char* str, char* raw)
+{
+	char *ptr = str;
+	char *end = str;
+	int tmp;
+	int byte = 0;
+
+	while (*end != 0 && byte < 6) {
+		tmp = strtol(ptr,&end,16);
+		if (*end != ':' && *end != 0) {
+			return false;
+		}
+
+		raw[byte] = tmp;
+		byte++;
+		ptr = end + 1;
+	}
+
+	if (byte != 6) {
+		return false;
+	}
+
+	return true;
+}
+
 unsigned long Attacker::normalize_time(char *s)
 {
 	unsigned long t;
@@ -666,6 +693,9 @@ Message Attacker::fixupIPv4(Message cur, Message ip_payload)
 		m.len = m.alloc = 0;
 		return m;
 	}
+
+	/*Set IP ID */
+	ip->id = ipv4_id++; 
 
 	/* Update packet length */
 	cur.len = ip_payload.len + ip->ihl*4;

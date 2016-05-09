@@ -48,6 +48,10 @@ class pkt_info {
 		Iface *snd;
 };
 
+/* Get interface commands */
+Iface *GetForwardInterface();
+Iface *GetBackwardInterface();
+
 /*debug printf
  * Levels:
  * 	0) Always print even if debug isn't specified
