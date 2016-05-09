@@ -3,10 +3,8 @@
 import os
 
 #Global
-system_home = os.path.dirname(os.path.realpath(__file__))
-#system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
+system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 #logs_loc = system_home + "/logs/inst{instance}.log"
-#enable_stat = True
 
 #VM Section
 vm_path = system_home + "/vms/"

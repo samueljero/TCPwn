@@ -208,7 +208,7 @@ Message Iface::recvMsg()
 		return m;
 	}
 
-	if ((m.len = read(sock,m.buff,m.len)) <= 0) {
+	if ((m.len = read(sock,m.buff,m.alloc)) <= 0) {
 		dbgprintf(0, "Read Failed: %s\n", strerror(errno));
 		free(m.buff);
 		m.buff = NULL;

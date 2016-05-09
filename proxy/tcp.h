@@ -25,6 +25,7 @@ class tcp_half {
 	unsigned long high_ack;
 	unsigned long window;
 	unsigned long pkts;
+	uint32_t renege_save;
 };
 
 class Injector {
@@ -70,16 +71,16 @@ class TCP: public Proto {
 		pkt_info process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &dst);
 		void init_conn_info(pkt_info pk, struct tcphdr *tcph, tcp_half &src, tcp_half &dst);
 		bool in_pkt_range(unsigned long pkt, unsigned long start, unsigned long stop);
-		void update_conn_info(struct tcphdr *tcph, tcp_half &src);
+		void update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src);
 		pkt_info PerformPreAck(pkt_info pk, Message hdr, tcp_half &dst);
-		pkt_info PerformRenege(pkt_info pk, Message hdr);
+		pkt_info PerformRenege(pkt_info pk, Message hdr, tcp_half &src);
 		pkt_info PerformDivision(pkt_info pk, Message hdr, tcp_half &old_src);
 		pkt_info PerformDup(pkt_info pk, Message hdr);
 		pkt_info PerformBurst(pkt_info pk, Message hdr);
 		bool BuildPacket(pkt_info &pk, Message &hdr, inject_info &info);
 		Message BuildEthHeader(Message pk, char* src, char* dst, int next);
 		Message BuildIPHeader(Message pk, uint32_t src, uint32_t dst, int next);
-		Message BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info &info, Message &ip_payload);
+		Message BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info &info, Message &ip_payload, uint32_t ipsrc, uint32_t ipdst);
 		bool StartInjector(inject_info &info);
 
 		tcp_half fwd;
@@ -108,9 +109,9 @@ class TCP: public Proto {
 		int preack_amt;
 		int renege_amt;
 		int renege_growth;
-		uint32_t renege_save;
 		int burst_num;
 		std::list<std::pair<pkt_info,Message> > burst_pkts;
+		pthread_mutex_t burst_mutex;
 		std::list<inject_info> injections;
 		std::list<Injector*> active_injectors;
 

@@ -400,6 +400,7 @@ bool Attacker::clear_connections()
 			src = connections.begin()->first;
 			dst = connections.begin()->second.begin()->first;
 			if (connections.begin()->second.begin()->second) {
+				connections.begin()->second.begin()->second->Clear();
 				delete connections.begin()->second.begin()->second;
 				connections[dst][src] = NULL;
 			}
@@ -407,6 +408,7 @@ bool Attacker::clear_connections()
 		}
 	}
 
+	dbgprintf(1, "Data cleared!\n");
 	return true;
 }
 
@@ -459,6 +461,7 @@ uint32_t Attacker::normalize_addr(char *s)
 {
 	struct addrinfo hints;
 	struct addrinfo *results, *p;
+	struct sockaddr_in *v4;
 	uint32_t res;
 
 	if (s[0] == '*') {
@@ -473,7 +476,8 @@ uint32_t Attacker::normalize_addr(char *s)
 	}
 
 	for (p = results; p!=NULL; p = p->ai_next) {
-		memcpy(&res, p->ai_addr, sizeof(uint32_t));
+		v4 = (struct sockaddr_in*)p->ai_addr;
+		res = v4->sin_addr.s_addr;
 		return res;
 	}
 
@@ -541,12 +545,13 @@ pkt_info Attacker::fixupAndSend(pkt_info pk, Message ip_payload, bool dosend)
 
 	if (!pk.valid || !pk.msg.buff) {
 		dbgprintf(0, "Error: Trying to send invalid packet\n");
+		return pk;
 	}
 
 	m = fixupEthernet(pk.msg,ip_payload);
 	
 	if (m.buff != pk.msg.buff || m.len > pk.msg.alloc || !pk.snd) {
-		dbgprintf(0, "Error: Trying to send invalid packet\n");
+		dbgprintf(0, "Error: Trying to send invalid packet--\n");
 		pk.valid = false;
 		pk.msg.buff = NULL;
 		return pk;
@@ -618,6 +623,7 @@ Message Attacker::fixupEthernet(Message cur, Message ip_payload)
 	}
 
 	/* Fixup buffer lengths */
+	m.alloc = cur.alloc;
 	m.buff = cur.buff;
 	m.len = m.len + sizeof(struct ether_header);
 	return m;
