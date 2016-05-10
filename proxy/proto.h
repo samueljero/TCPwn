@@ -35,7 +35,7 @@ class Proto {
 		virtual bool SetInject(unsigned long start, unsigned long stop, inject_info &info) = 0;
 		virtual bool SetDivision(unsigned long start, unsigned long stop, int bytes_per_chunk) = 0;
 		virtual bool SetDup(unsigned long start, unsigned long stop, int num) = 0;
-		virtual bool SetPreAck(unsigned long start, unsigned long stop, int amt) = 0;
+		virtual bool SetPreAck(unsigned long start, unsigned long stop, int amt, int method) = 0;
 		virtual bool SetRenege(unsigned long start, unsigned long stop, int amt, int growth) = 0;
 		virtual bool SetBurst(unsigned long start, unsigned long stop, int num) = 0;
 		virtual bool Clear() = 0;

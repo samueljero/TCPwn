@@ -4,7 +4,26 @@ import os
 
 #Global
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
-#logs_loc = system_home + "/logs/inst{instance}.log"
+logs_loc = system_home + "/logs/inst{instance}.log"
+currently_testing = "Ubuntu 14.04"
+
+#Baselining
+stat_baseline_nrounds = 3
+
+#Proxy
+proxy_com_port = 1026
+proxy_cmd = "/root/proxy/proxy -i eth1 -i eth2 -v -p {port}"
+limit_cmd = "/root/proxy/limit.sh"
+
+#Servers
+server_start_cmd = "service apache2 restart"
+
+#Clients
+background_client_cmd = "wget http://10.0.3.4/bigfile"
+main_client_cmd = "wget http://10.0.3.3/smallfile"
+
+#Coordinator
+coordinator_port = 3333
 
 #VM Section
 vm_path = system_home + "/vms/"
@@ -18,3 +37,4 @@ vm_cores = "2"
 vm_telnet_base = 10100
 vm_vnc_base = 1
 vm_ssh_key = system_home + "/config/ssh.key"
+vm_replace_data = True

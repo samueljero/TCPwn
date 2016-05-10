@@ -258,7 +258,14 @@ bool Attacker::addCommand(Message m, Message *resp)
 		case ACTION_ID_PREACK:
 			targ = args_find(args, "amt");
 			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
-				ret = obj->SetPreAck(start,stop,targ->value.i);
+				amt = targ->value.i;
+				targ = args_find(args, "method");
+				if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+					ret = obj->SetPreAck(start, stop, amt, targ->value.i);
+				} else {
+					dbgprintf(0, "Adding PREACK Command: failed with bad arguments (missing method tag)\n");
+					ret = false;
+				}
 			} else {
 				dbgprintf(0, "Adding PREACK Command: failed with bad arguments (missing amt tag)\n");
 				ret = false;

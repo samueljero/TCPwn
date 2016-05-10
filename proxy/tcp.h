@@ -26,6 +26,7 @@ class tcp_half {
 	unsigned long window;
 	unsigned long pkts;
 	uint32_t renege_save;
+	uint32_t preack_save;
 };
 
 class Injector {
@@ -61,7 +62,7 @@ class TCP: public Proto {
 		virtual bool SetInject(unsigned long start, unsigned long stop, inject_info &info);
 		virtual bool SetDivision(unsigned long start, unsigned long stop, int bytes_per_chunk);
 		virtual bool SetDup(unsigned long start, unsigned long stop, int num);
-		virtual bool SetPreAck(unsigned long start, unsigned long stop, int amt);
+		virtual bool SetPreAck(unsigned long start, unsigned long stop, int amt, int method);
 		virtual bool SetRenege(unsigned long start, unsigned long stop, int amt, int growth);
 		virtual bool SetBurst(unsigned long start, unsigned long stop, int num);
 		virtual bool Clear();
@@ -107,6 +108,7 @@ class TCP: public Proto {
 		int div_bpc;
 		int dup_num;
 		int preack_amt;
+		int preack_method;
 		int renege_amt;
 		int renege_growth;
 		int burst_num;

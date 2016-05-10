@@ -218,10 +218,18 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &dst)
 	tcph = (struct tcphdr*)hdr.buff;
 
 	ack = ntohl(tcph->th_ack);
-	if (false && SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
-		tcph->th_ack = htonl(dst.high_seq + 1);
-	} else {
-		tcph->th_ack = htonl(ack+preack_amt);
+	if (preack_method == 0) {
+		if (false && SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
+			tcph->th_ack = htonl(dst.high_seq + 1);
+		} else {
+			tcph->th_ack = htonl(ack+preack_amt);
+		}
+	} else if (preack_method == 1) {
+		if (SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
+			tcph->th_ack = htonl(dst.high_seq + 1);
+		} else {
+			tcph->th_ack = htonl(ack+preack_amt);
+		}
 	}
 
 	/* Update checksum */
@@ -578,11 +586,12 @@ bool TCP::SetDup(unsigned long start, unsigned long stop, int num)
 	return true;
 }
 
-bool TCP::SetPreAck(unsigned long start, unsigned long stop, int amt)
+bool TCP::SetPreAck(unsigned long start, unsigned long stop, int amt, int method)
 {
 	preack_start = start;
 	preack_stop = stop;
 	preack_amt = amt;
+	preack_method = method;
 	do_preack = true;
 	return true;
 }
