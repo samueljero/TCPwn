@@ -14,13 +14,14 @@ stat_baseline_nrounds = 3
 proxy_com_port = 1026
 proxy_cmd = "/root/proxy/proxy -i eth1 -i eth2 -v -p {port}"
 limit_cmd = "/root/proxy/limit.sh"
+proxy_kill_cmd = "pkill proxy"
 
 #Servers
 server_start_cmd = "service apache2 restart"
 
 #Clients
-background_client_cmd = "wget http://10.0.3.4/bigfile"
-main_client_cmd = "wget http://10.0.3.3/smallfile"
+background_client_cmd = "curl -o /dev/null http://10.0.3.4/bigfile"
+main_client_cmd = "curl -o /dev/null http://10.0.3.3/smallfile"
 
 #Coordinator
 coordinator_port = 3333

@@ -67,6 +67,9 @@ class CCTester:
         self.log.write('#' * 30 + "Starting Test " + str(self.testnum) + '#' * 30 + '\n')
         self.log.write(str(datetime.today()) + "\n")
 
+        #Cleanup anything leftover from prior tests
+        self._cleanup()
+
         # Start Proxy
         proxy = self._start_proxy()
         if proxy is None:
@@ -84,13 +87,15 @@ class CCTester:
             return (False, "System Failure")
 
         # Evaluate Results
+        print "Download Time " + str(res[1])
+        self.log.write("Download Time " + str(res[1]) + "\n")
 
         # Stop Proxy
         if self._stop_proxy(proxy) == False:
             self._stop_controllers()
             return (False, "System Failure")
 
-        # Cleanup Any Mininet Remnants
+        # Cleanup anything still around
         self._cleanup()
 
         # Log
@@ -153,22 +158,27 @@ class CCTester:
         
         shell = spur.SshShell(hostname = mv.vm2ip(self.tc[0]),username = config.vm_user,
                                   missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
+
+        #Setup NetEM
         try:
             ret = shell.run(["/bin/bash", "-i", "-c", config.limit_cmd])
-            self.log.write("Setting up netem: " + ret.output)
+            self.log.write("Setting up netem:\n" + ret.output)
         except Exception as e:
             print "Setting up netem failed: " + str(e)
             self.log.write("Setting up netem failed: " + str(e) + "\n")
             return None
+
+        #Start Proxy
         proxy = shell.spawn(["/bin/bash", "-i", "-c", cmd], store_pid=True, allow_error=True)
         if not proxy.is_running():
             res = proxy.wait_for_result()
             self.log.write("Proxy Failed to Start: " + res.output + res.stderr_output)
             return None
         else:
-            self.log.write("Started proxy on " + str(mv.vm2ip(self.tc[0]))+ "...")
+            self.log.write("Started proxy on " + str(mv.vm2ip(self.tc[0]))+ "...\n")
 
-        if(self._waitListening(mv.vm2ip(self.tc[0]), config.proxy_com_port, 240, True) == False):
+        #Wait for proxy to come up
+        if(self._waitListening(mv.vm2ip(self.tc[0]), config.proxy_com_port, 240, False) == False):
             self.log.write("Proxy Failed to start after 240 seconds!\n")
             print "Proxy Failed to Start after 240 seconds!"
             return None
@@ -191,6 +201,8 @@ class CCTester:
                 return False,0
         self.log.write("Servers Started...\n")
 
+        time.sleep(0.5)
+
         #Start background traffic
         shell = spur.SshShell(hostname=mv.vm2ip(self.clients[1]), username=config.vm_user,
                               missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
@@ -199,43 +211,55 @@ class CCTester:
             ret = background.wait_for_result()
             print "Background traffic command failed: %s %s" % (ret.output, ret.stderr_output)
             self.log.write("Background traffic command failed: %s %s\n" % (ret.output, ret.stderr_output))
-            return False,0
+            return False, 0
 
         #Start main traffic
         shell = spur.SshShell(hostname=mv.vm2ip(self.clients[0]), username=config.vm_user,
                               missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
         mts = time.time()
         ret = None
+        speed = 0
         try:
             ret = shell.run(["/bin/bash", "-i", "-c", config.main_client_cmd])
         except Exception as e:
             print "Main Traffic Command failed: " + str(e)
             self.log.write("Main Traffic Command Failed: " + str(e) + "\n")
             background.send_signal(2)
-            return False,0
-        speed = time.time() - mts
-        self.log.write("Main Traffic command output: %s\n" %(ret.output))
+            return False, 0
+        if ret.return_code is not 0:
+            self.log.write("Main Traffic Command Failed! Return Code: %d\n" % (ret.return_code))
+            print "Main Traffic Command Failed! Return Code: %d" % (ret.return_code)
+            speed = 0
+        else:
+            speed = time.time() - mts
+        self.log.write("Main Traffic command output: \n" + ret.stderr_output)
 
         #Wait for background traffic to finish
         while background.is_running():
               time.sleep(0.5)
-        self.log.write("Background Traffic command output: %s\n" %(background.wait_for_result().output))
+        self.log.write("Background Traffic command output: \n" + background.wait_for_result().stderr_output)
         return True, speed
 
     def _stop_proxy(self, proxy):
         if self.proxy_running is False:
             return True
         ts = time.time()
+
+        #Check whether proxy is still running
         if not proxy.is_running():
             print "Proxy has crashed!!!\n"
             self.log.write("Proxy has crashed!!!\n")
             self.log.flush()
             return False
+
+        #Stop Proxy
         proxy.send_signal(2)
         ret = proxy.wait_for_result()
+
+        #Write Output to Log
         self.log.write("***** Proxy Output*****\n")
-        self.log.write(ret.output)
         self.log.write(ret.stderr_output)
+        self.log.write("***********************\n")
         self.log.flush()
         self.log.write('[timer] Stop proxy: %f sec.\n' % (time.time() - ts))
         self.proxy_running = False
@@ -243,6 +267,14 @@ class CCTester:
 
     def _cleanup(self):
         ts = time.time()
+
+        #Kill Proxy
+        shell = spur.SshShell(hostname = mv.vm2ip(self.tc[0]),username = config.vm_user,
+                                  missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
+        try:
+            ret = shell.run(["/bin/bash", "-i", "-c", config.proxy_kill_cmd])
+        except Exception as e:
+            return False
         self.log.write('[timer] Clean up: %f sec.\n' % (time.time() - ts))
         return True
 
