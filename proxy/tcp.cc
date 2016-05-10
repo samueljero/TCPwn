@@ -218,11 +218,15 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &dst)
 	tcph = (struct tcphdr*)hdr.buff;
 
 	ack = ntohl(tcph->th_ack);
-	if (SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
+	if (false && SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
 		tcph->th_ack = htonl(dst.high_seq + 1);
 	} else {
 		tcph->th_ack = htonl(ack+preack_amt);
 	}
+
+	/* Update checksum */
+	tcph->th_sum = 0;
+	tcph->th_sum = ipv4_pseudohdr_chksum((u_char*)hdr.buff,hdr.len,(u_char*)pk.ip_dst,(u_char*)pk.ip_src,6);
 
 	//dbgprintf(2,"PreAck: %u -> %u\n", ack, ack + preack_amt);
 	return pk;
@@ -251,6 +255,10 @@ pkt_info TCP::PerformRenege(pkt_info pk, Message hdr, tcp_half &src)
 		tcph->th_ack = htonl(ack-renege_amt);
 		//dbgprintf(2, "Renege: %u -> %u\n", ack, ack - renege_amt);
 	}
+
+	/* Update Checksum */
+	tcph->th_sum = 0;
+	tcph->th_sum = ipv4_pseudohdr_chksum((u_char*)hdr.buff,hdr.len,(u_char*)pk.ip_dst,(u_char*)pk.ip_src,6);
 
 	return pk;
 }
