@@ -1,0 +1,146 @@
+#Notes:
+#  + time is represented as number of packets in the connection so far. Hence, it can also be
+#		thought of as the "chunk" or "location" in the connection where something occurs. I think
+#		this representation of time is more accurate and meaningful than milliseconds, either
+#		absolute or relevative to connection's start. In the following algorithm, both length and start
+#		are in these units.
+#  + Our target test connection should contain about 10-11k pkts in it. Hence, 5000 is about half way
+#		through the connection and 2000 is a nice 1/5 of the connection. Another value that shows up often
+#		is 4, which is right after the initial TCP handshake. Many of the values for length
+#		and start that I picked below are based on this kind of reasoning.
+#  + do_test() uses a threshold based on average plus two standard deviations of a set of baseline tests
+#		to identify attacks. This function will retry possible attacks to make sure that the attack is
+#		repeatable and not just some particularly bad queuing where our connection happened to get all
+#		the packet losses, etc.
+#  + Each test takes about 15 seconds
+
+Function to perform a test:
+do_test(list_of_strategies)
+
+Function to build a strategy:
+strategy(src_ip, dst_ip, action, start, stop, action_parameters)
+
+Our algorithm:
+Selfish_Receiver_Brute_Force(src,dst):
+	#Try each action individually
+
+	#Division Action (parameter: bytes_per_ack) --- 144 tests
+	for bytes_per_ack in (1000,100,10,1):
+		do_test(strategy(src,dst,DIVISION,0,all,bytes_per_ack))
+		for length in (all, 4000, 2000, 1000, 500, 100, 10):
+			for start in (0, 4, 100, 1000, 5000):
+				do_test(strategy(src,dst,DIVISION, start, start+length, bytes_per_ack))
+
+	#Duplicate Action (parameter: num_dups) --- 180 tests
+	for num_dups in (1,2,3,10,100):
+		do_test(src,dst,DUP,0,all,num_dups))
+		for length in (all, 4000, 2000, 1000, 500, 100, 10):
+			for start in (0, 4, 100, 1000, 5000):
+				do_test(strategy(src,dst,DUP,start,start+length,num_dups))
+
+	#Burst Action (parameter: burst_size) --- 144 tests
+	for burst_size in (2,4,10,100):
+		do_test(strategy(src,dst,BURST,0,all,burst_size))
+		for length in (all, 4000, 2000, 1000, 500, 100, 10):
+			for start in (0, 4, 100, 1000, 5000):
+				do_test(strategy(src,dst,BURST,start,start+length,burst_size))
+
+	#PreAck Action (Optimistic Acking) (parameter: amt_to_opt_ack) --- 180 tests
+	for amt_to_opt_ack in (100,1000,5000,10000,100000):
+		do_test(strategy(src,dst,PREACK,0,all,amt_to_opt_ack))
+		for length in (all, 4000, 2000, 1000, 500, 100, 10):
+			for start in (0, 4, 100, 1000, 5000):
+				do_test(strategy(src,dst,PREACK,start,start+length,amt_to_opt_ack))
+
+	#Renege Action (parameter: amt_to_renege) --- 144 tests
+	for amt_to_renege in (10,100,1000, 5000):
+		do_test(strategy(src,dst,PREACK,0,all,amt_to_renege))
+		for length in (all, 4000, 2000, 1000, 500, 100, 10):
+			for start in (0, 4, 100, 1000, 5000):
+				do_test(strategy(src,dst,PREACK,start,start+length,amt_to_renege))
+
+
+	#Combine actions
+	#Think of "chunks" of a connection
+	#Apply actions to side-by-side and overlapping chunks
+	#Note that division, duplication, and burst cannot be used overlapping; neither can preack and renege
+
+	#Combinations of two --- together and alternating --- 1600 tests (max)
+	for a_start in (0,2000,4000,6000):
+		for b_start in (0,2000,4000,6000):
+			for a_strat in (DIVISION,DUP,BURST,PREACK,RENEGE):
+				for b_strat in (DIVISION,DUP,BURST,PREACK,RENEGE):
+					if a_strat and b_strat are not compatible:
+						continue
+					if a_strat is DIVISION:
+						a_p = (1000,1)
+					if a_strat is DUP or BURST:
+						a_p = (2,10)
+					if a_strat is RENEGE or PREACK:
+						a_p = (1000,100000)
+					if b_strat is DIVISION:
+						b_p = (1000,1)
+					if b_strat is DUP or BURST:
+						b_p = (2,10)
+					if b_strat is RENEGE or PREACK:
+						b_p = (1000,100000)
+					for a_param in a_p:
+						for b_param in b_p:
+							do_test(strategy(src,dst,a_strat,a_start,a_start+2000,a_param),
+									strategy(src,dst,b_strat,b_start,b_start+2000,b_param))
+
+	#Combinations of three --- together and alternating --- 64,000 tests (max)
+	for a_start in (0,2000,4000,6000):
+		for b_start in (0,2000,4000,6000):
+			for c_start in (0,2000,4000,6000):
+			for a_strat in (DIVISION,DUP,BURST,PREACK,RENEGE):
+				for b_strat in (DIVISION,DUP,BURST,PREACK,RENEGE):
+					for c_strat in (DIVISION,DUP,BURST,PREACK,RENEGE):
+						if a_strat and b_strat and c_strat are not compatible:
+							continue
+						if a_strat is DIVISION:
+							a_p = (1000,1)
+						if a_strat is DUP or BURST:
+							a_p = (2,10)
+						if a_strat is RENEGE or PREACK:
+							a_p = (1000,100000)
+						if b_strat is DIVISION:
+							b_p = (1000,1)
+						if b_strat is DUP or BURST:
+							b_p = (2,10)
+						if b_strat is RENEGE or PREACK:
+							b_p = (1000,100000)
+						if c_strat is DIVISION:
+							c_p = (1000,1)
+						if c_strat is DUP or BURST:
+							c_p = (2,10)
+						if c_strat is RENEGE or PREACK:
+							c_p = (1000,100000)
+						for a_param in a_p:
+							for b_param in b_p:
+								for c_param in c_p:
+									do_test(strategy(src,dst,a_strat,a_start,a_start+2000,a_param),
+											strategy(src,dst,b_strat,b_start,b_start+2000,b_param),
+											strategy(src,dst,c_strat,c_start,c_start+2000,c_param))
+
+
+OffPath_Brute_Force(src,dst):
+	#Duplicate Action (parameter: num_dups) --- 180 tests
+	for num_dups in (1,2,3,10,100):
+		do_test(src,dst,DUP,0,all,num_dups))
+		for length in (all, 4000, 2000, 1000, 500, 100, 10):
+			for start in (0, 4, 100, 1000, 5000):
+				do_test(strategy(src,dst,DUP,start,start+length,num_dups))
+	#Injection Action --- would be more meaningful with ability to substitute seq/ack numbers dynamically
+
+Blind_Brute_Force(src,dst):
+	#Injection Action (parameters: freq, seq, ack, window, type) --- 576 tests
+	for freq in (10ms,100ms,1000ms,5000ms):
+		for window in (100,1000,5000,65535):
+			do_test(strategy(src,dst,INJECT,0,all,seq=Q,ack=R,freq,window))
+			for length in (all, 4000, 2000, 1000, 500, 100, 10):
+				for start in (0, 4, 100, 1000, 5000):
+					do_test(strategy(src,dst,INJECT,start,start+length,seq=Q,ack=R,freq,window))
+
+	#Should also get something about the Shrew attack
+	#But that requires more implementation---a custom data sending app
