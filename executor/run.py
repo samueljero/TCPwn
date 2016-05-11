@@ -105,7 +105,6 @@ def coordinated_tests(tester, instance, lg, addr):
 	rf = sock.makefile()
 
 	#Loop Testing Strategies
-	baseline_msg = None
 	while True:
 		print "****************"
 		#Ask for Next Strategy
@@ -154,14 +153,7 @@ def coordinated_tests(tester, instance, lg, addr):
 			strat = msg['data']
 			print "[%s] Test %d: %s" % (str(datetime.today()), num, str(strat))
 			lg.write("[%s] Test %d: %s\n" % (str(datetime.today()), num, str(strat)))
-			res = tester.doTest(strat)
-			# Check if rebaseline is suggested (0=for any metric).
-			if res[2] > 0:
-				s = "[%s] Rebaseline suggested. Value=%d." % (str(datetime.today()), res[2])
-				print s
-				lg.write(s + '\n')
-				tester.baseline(baseline_msg)
-				res = tester.doTest(strat) # Override the previous result.
+			res = tester.doTest(strat['strat'])
 			num+=1
 			
 			#Return Result and Feedback
@@ -170,7 +162,7 @@ def coordinated_tests(tester, instance, lg, addr):
 
 			fb = tester.retrieve_feedback()
 			try:
-				msg = {'msg':'RESULT','instance':"%s:%d"%(socket.gethostname(),instance), 'value':res[0], 'reason':res[1], 'feedback':fb, 'rebase': res[2]}
+				msg = {'msg':'RESULT','instance':"%s:%d"%(socket.gethostname(),instance), 'value':res[0], 'reason':res[1], 'feedback':fb}
 				sock.send("%s\n" %(repr(msg)))
 			except Exception as e:
 				print "Failed to send on socket..."
@@ -179,8 +171,7 @@ def coordinated_tests(tester, instance, lg, addr):
 		elif msg['msg'] == 'BASELINE':
 			print "[%s] Creating Baseline..." % (str(datetime.today()))
 			lg.write("[%s] Creating Baseline...\n" % (str(datetime.today())))
-			baseline_msg = msg['test']
-			tester.baseline(baseline_msg)
+			tester.baseline()
 
 			#Return Feedback
 			fb = tester.retrieve_feedback()
@@ -199,6 +190,8 @@ def coordinated_tests(tester, instance, lg, addr):
 	sock.close()
 
 def standalone_tests(tester):
+        print "Baselining..."
+        tester.baseline()
 	print "Starting Tests..."
 	print "Test 1   " + str(datetime.today())
 	res = tester.doTest(None)
@@ -206,6 +199,8 @@ def standalone_tests(tester):
 	print "******"
 
 def infinite_loop(tester):
+        print "Baselining..."
+        tester.baseline()
 	print "Starting Tests..."
 	i = 0
 	while True:

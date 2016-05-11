@@ -20,11 +20,15 @@ proxy_kill_cmd = "pkill proxy"
 server_start_cmd = "service apache2 restart"
 
 #Clients
-background_client_cmd = "curl -o /dev/null http://10.0.3.4/bigfile"
-main_client_cmd = "curl -o /dev/null http://10.0.3.3/smallfile"
+background_client_cmd = "curl -o /dev/null -m 240 http://10.0.3.4/bigfile"
+main_client_cmd = "curl -o /dev/null -m 240 http://10.0.3.3/smallfile"
 
 #Coordinator
 coordinator_port = 3333
+failed_retries = 1
+coord_checkpoint_file = system_home + "/logs/coord.ck"
+coord_log = system_home + "/logs/coord.log"
+coord_results_log = system_home + "/logs/results.log"
 
 #VM Section
 vm_path = system_home + "/vms/"

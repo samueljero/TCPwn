@@ -9,6 +9,7 @@ from datetime import datetime
 import socket
 import struct
 import threading
+import numpy
 
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 lib_path = os.path.abspath(os.path.join(system_home, 'executor', 'libs'))
@@ -33,13 +34,17 @@ class CCTester:
         self.testnum = 1
         self.creating_baseline = False
         self.timers = []
+        self.result_high_threshold = 0
+        self.result_low_threshold = 0
+        self.last_result = 0
 
-    def baseline(self, test_script):
+    def baseline(self):
         self.creating_baseline = True
         num = self.testnum
-        self.veriflow_flips = []
 
         # Do Baseline
+        self.result_high_threshold = self.result_low_threshold = 0
+        perf_measurements = []
         i = 0
         while i < config.stat_baseline_nrounds:
             self.testnum = 0
@@ -47,22 +52,39 @@ class CCTester:
             res = self.doTest(None)
             if res[0] == False:
                 print "Warning!!! Baseline failed!!!"
-                i += 1
+                continue
+            else:
+                perf_measurements.append(self.last_result)
+            i += 1
         
         self.testnum = num
         self.creating_baseline = False
 
+        #Compute threshold
+        avg  = sum(perf_measurements)/len(perf_measurements)
+        stddev = numpy.std(perf_measurements)
+        self.result_high_threshold = avg + 2*stddev
+        self.result_low_threshold = avg - 2*stddev
+
         # Log Thresholds
         decor = '$' * 40 + ' Thresholds ' + '$' * 40 + '\n'
         self.log.write(decor)
+        self.log.write("Average: " + str(avg) + "\n")
+        self.log.write("Standard Deviation: " + str(stddev) + "\n")
+        self.log.write("High Threshold: " + str(self.result_high_threshold) + "\n")
+        self.log.write("Low Threshold: " + str(self.result_low_threshold) + "\n")
         self.log.write(decor)
         self.log.flush()
+
+    def retrieve_feedback(self):
+        return {'high':self.result_high_threshold,'low':self.result_low_threshold,'last':self.last_result}
 
     def doTest(self, strategy):
         """
         :return [True | False, str]: First boolean value indicates pass or fail,
         	followed by an explanation
         """
+        self.last_result = 0
         result = [True, "Success!"]
         self.log.write('#' * 30 + "Starting Test " + str(self.testnum) + '#' * 30 + '\n')
         self.log.write(str(datetime.today()) + "\n")
@@ -89,6 +111,11 @@ class CCTester:
         # Evaluate Results
         print "Download Time " + str(res[1])
         self.log.write("Download Time " + str(res[1]) + "\n")
+        self.last_result = res[1]
+        if self.result_low_threshold > 0 and self.result_high_threshold > 0:
+            if self.last_result < self.result_low_threshold or self.last_result > self.result_high_threshold:
+                result[0] = False
+                result[1] = "Performance"
 
         # Stop Proxy
         if self._stop_proxy(proxy) == False:
@@ -101,8 +128,9 @@ class CCTester:
         # Log
         self.log.flush()
         self.log.write("*****************\n")
-        self.log.write("Test Result: " +
-                       str(result[0]) + " , Reason:" + str(result[1]) + "\n")
+        self.log.write("Test Result: " + str(result[0]) + ", Reason: " + str(result[1]) + "\n")
+        self.log.write("Performance: " + str(self.last_result) + "\n")
+        self.log.write("Thresholds: Low " + str(self.result_low_threshold) + ", High " + str(self.result_high_threshold) + "\n")
         self.log.write(str(datetime.today()) + "\n")
         self.log.write("##############################Ending Test " +
                        str(self.testnum) + "###################################\n")
