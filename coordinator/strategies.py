@@ -39,7 +39,7 @@ class StrategyGenerator:
 			return None
 
 		#Select next strategy
-		strat = self.strat_lst.pop()
+		strat = self.strat_lst.pop(0)
                 self.proc_lst.append(strat)
 
                 self.strat_num += 1

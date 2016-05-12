@@ -19,21 +19,38 @@ def startvm(num):
         net = ((num-1) / len(config.vm_name_bases))+1
         host = (num-1) % len(config.vm_name_bases)
 	img=config.vm_path + config.vm_name_bases[(num-1)%len(config.vm_name_bases)] + str(num) + ".qcow2"
-        nics = ""
-	nics += " -net nic,model=virtio,macaddr=00:00:00:01:00:{:02X},vlan=0 -net tap,ifname=tap-n{}-h{:d},downscript=no,script=no,vlan=0 ".format(num,net,host)
-        nics += " -net user,vlan=1 -net nic,vlan=1 "
-        nets = config.vm_net[(num-1)%len(config.vm_net)]
-        for i in range(0,len(nets)):
-            tap = nets[i].format(n=net)
-	    nics += " -net nic,model=virtio,macaddr=00:00:00:01:{:02X}:{:02X},vlan={} -net tap,ifname={},downscript=no,script=no,vlan={} ".format(i+1,num,i+2,tap,i+2) 
-	vnc="-vnc 127.0.0.1:{0}".format(str(config.vm_vnc_base + num))
-	telnet= config.vm_telnet_base + num
-	os.system("qemu-system-x86_64 -hda {0} -m {1} -smp {2} -enable-kvm -k \"en-us\" {3} {4} -monitor telnet:127.0.0.1:{5},server,nowait &".format(img,config.vm_ram,config.vm_cores,nics, vnc,str(telnet)))
+        if config.vm_name_bases[(num-1)%len(config.vm_name_bases)] == "windows95-server":
+            nics = ""
+    	    nics += " -net nic,model=ne2k_pci,macaddr=00:00:00:01:00:{:02X},vlan=0 -net tap,ifname=tap-n{}-h{:d},downscript=no,script=no,vlan=0 ".format(num,net,host)
+            nets = config.vm_net[(num-1)%len(config.vm_net)]
+            for i in range(0,len(nets)):
+                tap = nets[i].format(n=net)
+	        nics += " -net nic,model=ne2k_pci,macaddr=00:00:00:01:{:02X}:{:02X},vlan={} -net tap,ifname={},downscript=no,script=no,vlan={} ".format(i+1,num,i+2,tap,i+2) 
+    	    vnc="-vnc 127.0.0.1:{0}".format(str(config.vm_vnc_base + num))
+    	    telnet= config.vm_telnet_base + num
+    	    os.system("qemu-system-x86_64 -hda {0} -m {1} -M pc -vga std -no-kvm -k \"en-us\" {2} {3} -monitor telnet:127.0.0.1:{4},server,nowait &".format(img,"256M",nics, vnc,str(telnet)))
+        else:
+            nics = ""
+    	    nics += " -net nic,model=virtio,macaddr=00:00:00:01:00:{:02X},vlan=0 -net tap,ifname=tap-n{}-h{:d},downscript=no,script=no,vlan=0 ".format(num,net,host)
+            nics += " -net user,vlan=1 -net nic,vlan=1 "
+            nets = config.vm_net[(num-1)%len(config.vm_net)]
+            for i in range(0,len(nets)):
+                tap = nets[i].format(n=net)
+	        nics += " -net nic,model=virtio,macaddr=00:00:00:01:{:02X}:{:02X},vlan={} -net tap,ifname={},downscript=no,script=no,vlan={} ".format(i+1,num,i+2,tap,i+2) 
+    	    vnc="-vnc 127.0.0.1:{0}".format(str(config.vm_vnc_base + num))
+    	    telnet= config.vm_telnet_base + num
+    	    os.system("qemu-system-x86_64 -hda {0} -m {1} -smp {2} -enable-kvm -k \"en-us\" {3} {4} -monitor telnet:127.0.0.1:{5},server,nowait &".format(img,config.vm_ram,config.vm_cores,nics, vnc,str(telnet)))
 
 def stopvm(num):
-	os.system("ssh -i {0} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {1}@{2} \"shutdown -h now\" &".format(config.vm_ssh_key,config.vm_user, config.vm_ip_base.format(num)))
+        if vmHasSSH(num):
+            os.system("ssh -i {0} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {1}@{2} \"shutdown -h now\" &".format(config.vm_ssh_key,config.vm_user, config.vm_ip_base.format(num)))
+        else:
+            killvm(num)
 
 def suspendvm(num, namebase):
+        if config.vm_name_bases[(num-1)%len(config.vm_name_bases)] == "windows95-server":
+            print "Error: Suspend not supported for Windows 95"
+            return
 	filename = namebase + str(num) + ".sav"
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	s.connect(("127.0.0.1", config.vm_telnet_base + num))
@@ -47,6 +64,9 @@ def suspendvm(num, namebase):
 	s.close()
 
 def resumevm(num, namebase):
+        if config.vm_name_bases[(num-1)%len(config.vm_name_bases)] == "windows95-server":
+            print "Error: Resume not supported for Windows 95"
+            return
         net = (num-1) / len(config.vm_name_bases)
         host = (num-1) % len(config.vm_name_bases)
 	img=config.vm_path + config.vm_name_bases[(num-1)%len(config.vm_name_bases)] + str(num) + ".qcow2"
@@ -76,6 +96,9 @@ def killvm(num):
 
 def vm2ip(num):
 	return config.vm_ip_base.format(str(num))
+
+def vmHasSSH(num):
+        return config.vm_has_ssh[(num-1)%len(config.vm_has_ssh)]
 
 def initvm(num):
 	os.system("cat {0} | ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no {1}@{2} \"cat >> ~/.ssh/authorized_keys\"".format(config.vm_ssh_key,config.vm_user, config.vm_ip_base.format(num)))

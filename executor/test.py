@@ -147,15 +147,15 @@ class CCTester:
             mv.startvm(t)   
         for c in self.clients:
             if(self._waitListening(mv.vm2ip(c), 22, 240, True) == False):
-                print "Error: Controller VM %d not started!" % (c)
+                print "Error: client VM %d not started!" % (c)
                 return False
         for s in self.servers:
-            if(self._waitListening(mv.vm2ip(s), 22, 240, True) == False):
-                print "Error: Mininet %d not started!" % (c)
+            if(self._waitListening(mv.vm2ip(s), 22 if mv.vmHasSSH(s) else 80, 240, True) == False):
+                print "Error: server VM %d not started!" % (s)
                 return False
         for t in self.tc:
             if(self._waitListening(mv.vm2ip(t), 22, 240, True) == False):
-                print "Error: Mininet %d not started!" % (c)
+                print "Error: Traffic Shaping VM %d not started!" % (t)
                 return False
             else:
                 if config.vm_replace_data:
@@ -219,11 +219,16 @@ class CCTester:
 
         #Start servers
         for s in self.servers:
-            shell = spur.SshShell(hostname=mv.vm2ip(s), username=config.vm_user,
+            if mv.vmHasSSH(s):
+                shell = spur.SshShell(hostname=mv.vm2ip(s), username=config.vm_user,
                               missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
-            try:
-                ret = shell.run(["/bin/bash", "-i", "-c", config.server_start_cmd])
-            except Exception as e:
+                try:
+                    ret = shell.run(["/bin/bash", "-i", "-c", config.server_start_cmd])
+                except Exception as e:
+                    print "Failed to start server"
+                    self.log.write("Failed to start server\n")
+                    return False,0
+            if(self._waitListening(mv.vm2ip(s),80, 240, False) == False):
                 print "Failed to start server"
                 self.log.write("Failed to start server\n")
                 return False,0
@@ -248,11 +253,14 @@ class CCTester:
         ret = None
         speed = 0
         try:
-            ret = shell.run(["/bin/bash", "-i", "-c", config.main_client_cmd])
+            ret = shell.run(["/bin/bash", "-i", "-c", config.main_client_cmd],allow_error=True)
         except Exception as e:
             print "Main Traffic Command failed: " + str(e)
             self.log.write("Main Traffic Command Failed: " + str(e) + "\n")
-            background.send_signal(2)
+            try:
+                background.send_signal(2)
+            except Exception as e:
+                pass
             return False, 0
         if ret.return_code is not 0:
             self.log.write("Main Traffic Command Failed! Return Code: %d\n" % (ret.return_code))

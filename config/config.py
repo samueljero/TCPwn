@@ -8,7 +8,7 @@ logs_loc = system_home + "/logs/inst{instance}.log"
 currently_testing = "Ubuntu 14.04"
 
 #Baselining
-stat_baseline_nrounds = 3
+stat_baseline_nrounds = 5
 
 #Proxy
 proxy_com_port = 1026
@@ -33,8 +33,9 @@ coord_results_log = system_home + "/logs/results.log"
 #VM Section
 vm_path = system_home + "/vms/"
 master_name = "/ubuntu-1404-master.qcow2"
-vm_name_bases = ["client", "client","server","server", "tc"]
+vm_name_bases = ["client", "client","windows95-server","server", "tc"]
 vm_net = [["tap-n{n}-b1-h0"],["tap-n{n}-b1-h1"],["tap-n{n}-b2-h0"],["tap-n{n}-b2-h1"],["tap-n{n}-b1-h2","tap-n{n}-b2-h2"]]
+vm_has_ssh = [True,True,False,True]
 vm_user = "root"
 vm_ip_base = "10.0.1.{0}"
 vm_ram = "2048"
