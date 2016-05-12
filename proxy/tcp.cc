@@ -49,8 +49,12 @@ TCP::TCP(uint32_t src, uint32_t dst)
 	rev.have_initial_ack = false;
 	total_pkts = 0;
 
-	do_div = do_dup = do_preack = false;
-	do_renege = do_burst = do_print = false;
+	do_div = false;
+	do_dup = false;
+	do_preack = false;
+	do_renege = false;
+	do_burst = false;
+	do_print = false;
 
 	pthread_mutex_init(&burst_mutex, NULL);
 }
@@ -97,8 +101,8 @@ pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &
 
 	/* debug printing */
 	if (do_print) {
-		dbgprintf(0,"%u:%i -> %u:%i, seq: %u, ack: %u\n",
-				src.ip,src.port,dst.ip,dst.port,
+		dbgprintf(0,"#%u: %u:%i -> %u:%i, seq: %u, ack: %u\n",
+				total_pkts,src.ip,src.port,dst.ip,dst.port,
 				ntohl(tcph->th_seq),ntohl(tcph->th_ack));
 	}
 
@@ -109,7 +113,7 @@ pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &
 	}
 
 	if (do_preack && in_pkt_range(total_pkts,preack_start,preack_stop)) {
-		pk = PerformPreAck(pk,hdr,dst);
+		pk = PerformPreAck(pk,hdr,src,dst);
 		mod = true;
 	} else if (do_renege && in_pkt_range(total_pkts,renege_start,renege_stop)) {
 		pk = PerformRenege(pk,hdr,src);
@@ -210,7 +214,7 @@ void TCP::update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src)
 	}
 }
 
-pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &dst)
+pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &dst)
 {
 	struct tcphdr *tcph;
 	uint32_t ack;
@@ -219,16 +223,23 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &dst)
 
 	ack = ntohl(tcph->th_ack);
 	if (preack_method == 0) {
-		if (false && SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
+		/* Constant positive offset */
+		if (SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
 			tcph->th_ack = htonl(dst.high_seq + 1);
 		} else {
 			tcph->th_ack = htonl(ack+preack_amt);
 		}
 	} else if (preack_method == 1) {
+		/* Keep Acking */
+		if (!src.preack_save) {
+			src.preack_save = ack;
+		}
 		if (SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
-			tcph->th_ack = htonl(dst.high_seq + 1);
+			src.preack_save = dst.high_seq + 1;
+			tcph->th_ack = htonl(src.preack_save);
 		} else {
-			tcph->th_ack = htonl(ack+preack_amt);
+			src.preack_save = src.preack_save + preack_amt;
+			tcph->th_ack = htonl(src.preack_save);
 		}
 	}
 

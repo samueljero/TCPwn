@@ -7,6 +7,7 @@ from datetime import datetime
 import re
 import pprint
 from types import NoneType
+import manipulations
 
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 config_path = os.path.abspath(os.path.join(system_home, 'config'))
@@ -75,10 +76,52 @@ class StrategyGenerator:
                 return
 
 	def build_strategies(self):
-                for i in range(0,100):
-                    self.strat_lst.append({'strat':["*,*,TCP,0,0,CLEAR,*"], 'priority':0, 'retries':0})
-		self.lg.write("[%s] Strategies: %d\n" % (str(datetime.today()),len(self.strat_lst)))
+                src_ip = "10.0.3.1"
+                dst_ip = "10.0.3.3"
+                proto = "TCP"
+
+                #Single Action strategies
+                for action,template,params,ignore in manipulations.selfish_receiver_actions:
+                    for p in params:
+                        s = {'strat':[self._create_strat(src_ip,dst_ip,proto,0,0,action,template,p)], 'priority':0, 'retries':0}
+                        self.strat_lst.append(s)
+                        for length in manipulations.length_full:
+                            for start in manipulations.start_full:
+                                s = {'strat':[self._create_strat(src_ip,dst_ip,proto,start,start+length,action,template,p)], 'priority':0, 'retries':0}
+                                self.strat_lst.append(s)
+
+                #Combinations of two
+                for a_start in manipulations.chunk_start:
+                    for b_start in manipulations.chunk_start:
+                        for a_action,a_template,a_ignore,a_params in manipulations.selfish_receiver_actions:
+                            for b_action,b_template,b_ignore,b_params in manipulations.selfish_receiver_actions:
+                                if not self._actions_compatible(a_action,b_action,a_start,b_start):
+                                    continue
+                                for a_p in a_params:
+                                    for b_p in b_params:
+                                        s = {'strat':[ self._create_strat(src_ip,dst_ip,proto,a_start,a_start+manipulations.chunk_len,a_action,a_template,a_p),
+                                                       self._create_strat(src_ip,dst_ip,proto,b_start,b_start+manipulations.chunk_len,b_action,b_template,b_p)],
+                                             'priority':0, 'retries':0}
+                                        self.strat_lst.append(s)
+		
+                self.lg.write("[%s] Strategies: %d\n" % (str(datetime.today()),len(self.strat_lst)))
 		print "[%s] Strategies: %d" % (str(datetime.today()),len(self.strat_lst))
+
+
+        def _create_strat(self, src_ip, dst_ip, proto, start, end, action, p_template, p_arg):
+            args = p_template.format(p_arg)
+            strat = "%s,%s,%s,%d,%d,%s,%s" % (src_ip, dst_ip, proto, start, end, action, args)
+            return strat
+
+        def _actions_compatible(self,action_a, action_b, start_a, start_b):
+            if action_a == action_b:
+                return False
+            if start_a == start_b:
+                if action_a in ["DIV", "DUP", "BURST"] and action_b in ["DIV", "DUP", "BURST"]:
+                    return False
+                if action_a in ["PREACK", "RENEGE"] and action_b in ["PREACK", "RENEGE"]:
+                    return False
+            return True
 
 	def enable_checkpointing(self, f):
 		self.ck_file = f

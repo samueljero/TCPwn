@@ -73,7 +73,7 @@ class TCP: public Proto {
 		void init_conn_info(pkt_info pk, struct tcphdr *tcph, tcp_half &src, tcp_half &dst);
 		bool in_pkt_range(unsigned long pkt, unsigned long start, unsigned long stop);
 		void update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src);
-		pkt_info PerformPreAck(pkt_info pk, Message hdr, tcp_half &dst);
+		pkt_info PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &dst);
 		pkt_info PerformRenege(pkt_info pk, Message hdr, tcp_half &src);
 		pkt_info PerformDivision(pkt_info pk, Message hdr, tcp_half &old_src);
 		pkt_info PerformDup(pkt_info pk, Message hdr);
