@@ -15,12 +15,21 @@ using namespace std;
 bool Iface::sendm(Message m)
 {
 	int len;
+	int retries = 0;
 	if (sock < 0) {
 		return false;
 	}
 	
+retry:
 	if ((len = send(sock, m.buff, m.len, MSG_NOSIGNAL)) < 0) {
+		if (retries < 100 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR ||
+			errno == ENOBUFS || errno == ENOMEM)) {
+				retries++;
+				dbgprintf(0, "Send Failed (retry %i): %s\n", retries, strerror(errno));
+				goto retry;
+		}
 		dbgprintf(0, "Send Failed: %s\n", strerror(errno));
+		
 		_stop();
 		return false;
 	}

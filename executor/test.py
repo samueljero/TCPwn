@@ -113,9 +113,12 @@ class CCTester:
         self.log.write("Download Time " + str(res[1]) + "\n")
         self.last_result = res[1]
         if self.result_low_threshold > 0 and self.result_high_threshold > 0:
-            if self.last_result < self.result_low_threshold or self.last_result > self.result_high_threshold:
+            if self.last_result < self.result_low_threshold:
                 result[0] = False
-                result[1] = "Performance"
+                result[1] = "Performance -- Faster"
+            if self.last_result > self.result_high_threshold:
+                result[0] = False
+                result[1] = "Performance -- Slower"
 
         # Stop Proxy
         if self._stop_proxy(proxy) == False:
@@ -265,7 +268,7 @@ class CCTester:
         if ret.return_code is not 0:
             self.log.write("Main Traffic Command Failed! Return Code: %d\n" % (ret.return_code))
             print "Main Traffic Command Failed! Return Code: %d" % (ret.return_code)
-            speed = 0
+            speed = 240
         else:
             speed = time.time() - mts
         self.log.write("Main Traffic command output: \n" + ret.stderr_output)
