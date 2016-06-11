@@ -8,6 +8,8 @@ import re
 import pprint
 from types import NoneType
 import manipulations
+from email.mime.text import MIMEText
+import smtplib
 
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 config_path = os.path.abspath(os.path.join(system_home, 'config'))
@@ -53,15 +55,17 @@ class StrategyGenerator:
 	def return_strategy(self, strat):
 		self.failed_lst.append(strat)
 
-	def strategy_result(self, strat, res):
-		if res[0] == False:
+	def strategy_result(self, strat, result, reason, feedback):
+		if result == False:
+                        if reason == "System Failure":
+                            self._send_warning_email(strat)
                         strat['retries']+= 1
 			if strat['retries'] <= config.failed_retries:
                                 self.lg.write("[%s] Strategy will be retried: %s\n" % (str(datetime.today()),str(strat)))
 				self.failed_lst.append(strat)
 			else:
 				#Final failure, record in result file
-				lst = ["FAILED", str(datetime.today()),strat, res[1]]
+				lst = ["FAILED", str(datetime.today()),strat, reason, feedback['capture']]
 				self.results.write("%s\n" %(str(lst)))
 				self.results.flush()
 				self.lg.write("[%s] Strategy HARD FAILED: %s\n" % (str(datetime.today()),str(strat)))
@@ -122,6 +126,29 @@ class StrategyGenerator:
                 if action_a in ["PREACK", "RENEGE"] and action_b in ["PREACK", "RENEGE"]:
                     return False
             return True
+
+        def _send_warning_email(self, strat):
+            if not config.email_on_system_fail:
+                return
+            msg = """Administrator,
+This message is to notify you that a strategy being tested by the Congestion Control
+testing system has failed and indicated that it was a System Failure. The strategy was:
+"""
+            msg += strat
+            msg += """
+
+
+The CC Testing System
+            """
+            msg = MIMEText(msg)
+            msg["Subject"] = "CC Testing: System Failure"
+            msg["From"] = config.src_email_address
+            msg["To"] = config.dst_email_address
+
+            s = smtplib.SMTP("localhost")
+            s.sendmail(config.src_email_address, [config.dst_email_address], msg.as_string())
+            s.quit()
+            return
 
 	def enable_checkpointing(self, f):
 		self.ck_file = f

@@ -15,7 +15,8 @@ def do_network(cmd, num):
                 #Host bridge
 		os.system("sudo brctl addbr brhost")
 		os.system("sudo ifconfig brhost 10.0.0.1 netmask 255.255.0.0 up")
-		os.system("echo \"\" > /tmp/ip-mac")
+                os.system("touch /tmp/ip-mac")
+		os.system("echo \"\" >> /tmp/ip-mac")
                 #Host VM taps and DHCP config
 		for i in range(0,5):
 			os.system("sudo tunctl -u {0} -t tap-n{1}-h{2}".format(user, str(num),str(i)))

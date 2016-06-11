@@ -181,7 +181,7 @@ class ExecutorHandler(ss.StreamRequestHandler):
 				#Process Result
 				strat_lock.acquire()
 				strat_gen.strategy_feedback(strat, feedback, res)
-				strat_gen.strategy_result(strat, (res,reason))
+				strat_gen.strategy_result(strat, res, reason, feedback)
 				strat_lock.release()
 
 				#Clear Current Strategy

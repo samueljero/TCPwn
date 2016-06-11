@@ -5,7 +5,15 @@ import os
 #Global
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 logs_loc = system_home + "/logs/inst{instance}.log"
-currently_testing = "Ubuntu 14.04"
+currently_testing = "Windows 95"
+
+#Captures
+do_capture = True
+captures_loc = system_home + "/captures/{tm}-e{exe}.dmp"
+captures_time_str = "%Y-%m-%d-%H-%M-%S"
+capture_cmd = "tcpdump -i eth2 -s64 -U -w - tcp"
+capture_kill_cmd = "pkill tcpdump"
+
 
 #Baselining
 stat_baseline_nrounds = 5
@@ -29,6 +37,10 @@ failed_retries = 1
 coord_checkpoint_file = system_home + "/logs/coord.ck"
 coord_log = system_home + "/logs/coord.log"
 coord_results_log = system_home + "/logs/results.log"
+email_on_system_fail = True
+dst_email_address = "samuel.jero@gmail.com"
+src_email_address = "cctester@sound.cs.purdue.edu"
+
 
 #VM Section
 vm_path = system_home + "/vms/"

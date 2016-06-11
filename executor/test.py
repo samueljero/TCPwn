@@ -3,6 +3,7 @@
 import manage_vms as mv
 import os
 import sys
+import shlex
 import subprocess
 import time
 from datetime import datetime
@@ -15,7 +16,6 @@ system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 lib_path = os.path.abspath(os.path.join(system_home, 'executor', 'libs'))
 config_path = os.path.abspath(os.path.join(system_home, 'config'))
 proxy_path = os.path.abspath(os.path.join(system_home, 'proxy'))
-log_path = os.path.abspath(os.path.join(system_home, 'logs'))
 sys.path.insert(1, lib_path)
 sys.path.insert(0, config_path)
 import config
@@ -37,6 +37,8 @@ class CCTester:
         self.result_high_threshold = 0
         self.result_low_threshold = 0
         self.last_result = 0
+        self.do_capture = config.do_capture
+        self.last_cap = ""
 
     def baseline(self):
         self.creating_baseline = True
@@ -77,7 +79,7 @@ class CCTester:
         self.log.flush()
 
     def retrieve_feedback(self):
-        return {'high':self.result_high_threshold,'low':self.result_low_threshold,'last':self.last_result}
+        return {'high':self.result_high_threshold,'low':self.result_low_threshold,'last':self.last_result, 'capture':self.last_cap}
 
     def doTest(self, strategy):
         """
@@ -102,11 +104,20 @@ class CCTester:
             self._stop_proxy(proxy)
             return (False, "System Failure")
 
+        #Start capture, if needed
+        cap = None
+        cap_f = None
+        if self.do_capture:
+            cap,cap_f = self._start_capture()
+    
         # Do Test
         res = self._call_test()
         if res[0] is False:
             self._stop_proxy(proxy)
+            self._stop_capture(cap, cap_f)
             return (False, "System Failure")
+
+        self._stop_capture(cap, cap_f)
 
         # Evaluate Results
         print "Download Time " + str(res[1])
@@ -134,6 +145,7 @@ class CCTester:
         self.log.write("Test Result: " + str(result[0]) + ", Reason: " + str(result[1]) + "\n")
         self.log.write("Performance: " + str(self.last_result) + "\n")
         self.log.write("Thresholds: Low " + str(self.result_low_threshold) + ", High " + str(self.result_high_threshold) + "\n")
+        self.log.write("Capture: " + str(self.last_cap) + "\n")
         self.log.write(str(datetime.today()) + "\n")
         self.log.write("##############################Ending Test " +
                        str(self.testnum) + "###################################\n")
@@ -434,4 +446,65 @@ class CCTester:
         sock.close()
         if wait_for_response:
             return rsp
+        return True
+
+    def _start_capture(self):
+        self.last_cap = ""
+        if not self.do_capture:
+            return None,None
+
+        #Generate Capture Name
+        time_str = time.strftime(config.captures_time_str)
+        fname=config.captures_loc.format(tm=time_str,exe=self.instance)
+        self.last_cap = fname
+
+        #Open Capture file
+        f = open(fname,"w")
+
+        #Generate capture command
+        cmd = config.capture_cmd
+
+        #Start SSH Shell
+        shell = spur.SshShell(hostname = mv.vm2ip(self.tc[0]),username = config.vm_user,
+                                  missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
+
+        #Start Capture
+        cap = None
+        try:
+                cap = shell.spawn(["/bin/bash", "-i", "-c", cmd], store_pid=True, allow_error=True,stdout=f)
+                if not cap.is_running():
+                    res = proxy.wait_for_result()
+                    self.log.write("Capture Failed to Start: " +  res.stderr_output)
+                    f.close()
+                    return None,None
+        except Exception as e:
+            print e
+            self.log.write("Exception: " + str(e) + "\n")
+            self.log.flush()
+            f.close()
+            return None,None
+
+        return cap,f
+
+
+    def _stop_capture(self, cap, f):
+        if not cap or not f:
+            return True
+
+        cap.send_signal(2)
+        
+        #Start SSH Shell
+        shell = spur.SshShell(hostname = mv.vm2ip(self.tc[0]),username = config.vm_user,
+                                  missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
+        try:
+                shell.run(["/bin/bash", "-i", "-c", config.capture_kill_cmd], allow_error=True)
+        except Exception as e:
+            pass
+
+        cap.wait_for_result()
+        f.close()
+
+        if len(self.last_cap) > 0:
+            os.system("gzip " + self.last_cap)
+            self.last_cap += ".gz"
         return True
