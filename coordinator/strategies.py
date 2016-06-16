@@ -134,7 +134,7 @@ class StrategyGenerator:
 This message is to notify you that a strategy being tested by the Congestion Control
 testing system has failed and indicated that it was a System Failure. The strategy was:
 """
-            msg += strat
+            msg += str(strat)
             msg += """
 
 
@@ -202,7 +202,7 @@ The CC Testing System
 			return False
 		self.strat_lst = bkup['strat_lst']
                 self.proc_lst = bkup['proc_lst']
-		self.strat_num = bkup['srat_num']
+		self.strat_num = bkup['strat_num']
 		self.failed_lst = bkup['failed_lst']
 
 		f.close()
