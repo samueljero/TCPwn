@@ -28,7 +28,9 @@ retry:
 				return true;
 			} else {
 				retries++;
-				dbgprintf(0, "Send Failed (retry %i): %s\n", retries, strerror(errno));
+				if (retries%1000 == 0) {
+					dbgprintf(0, "Send Failed (retry %i): %s\n", retries, strerror(errno));
+				}
 				pthread_yield();
 				goto retry;
 			}
