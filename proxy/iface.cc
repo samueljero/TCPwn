@@ -27,10 +27,10 @@ retry:
 				dbgprintf(1, "Packet Dropped due to queuing\n");
 				return true;
 			} else {
-				retries++;
 				if (retries%1000 == 0) {
 					dbgprintf(0, "Send Failed (retry %i): %s\n", retries, strerror(errno));
 				}
+				retries++;
 				pthread_yield();
 				goto retry;
 			}
