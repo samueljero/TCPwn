@@ -12,7 +12,7 @@ class Iface{
 		Iface();
 		Iface(std::string interface);
 		~Iface();
-		bool sendm(Message m);
+		bool sendm(Message m, bool allow_drop = false);
 		bool start();
 		bool stop();
 		bool isRunning() {return running || rcv_thread_running;}

@@ -12,7 +12,7 @@ using namespace std;
 
 
 
-bool Iface::sendm(Message m)
+bool Iface::sendm(Message m, bool allow_drop)
 {
 	int len;
 	int retries = 0;
@@ -22,11 +22,16 @@ bool Iface::sendm(Message m)
 	
 retry:
 	if ((len = send(sock, m.buff, m.len, MSG_NOSIGNAL)) < 0) {
-		if (retries < 100 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR ||
-			errno == ENOBUFS || errno == ENOMEM)) {
+		if (errno == ENOBUFS || errno == ENOMEM) {
+			if (allow_drop) {
+				dbgprintf(1, "Packet Dropped due to queuing\n");
+				return true;
+			} else {
 				retries++;
 				dbgprintf(0, "Send Failed (retry %i): %s\n", retries, strerror(errno));
+				pthread_yield();
 				goto retry;
+			}
 		}
 		dbgprintf(0, "Send Failed: %s\n", strerror(errno));
 		
@@ -194,7 +199,7 @@ void Iface::rcv_run()
 		}
 
 		/* Send message */
-		if(!other->sendm(pk.msg)) {
+		if(!other->sendm(pk.msg, true)) {
 			_stop();
 			break;
 		}
