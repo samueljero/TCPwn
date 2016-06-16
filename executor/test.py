@@ -106,18 +106,17 @@ class CCTester:
 
         #Start capture, if needed
         cap = None
-        cap_f = None
         if self.do_capture:
-            cap,cap_f = self._start_capture()
+            cap = self._start_capture()
     
         # Do Test
         res = self._call_test()
         if res[0] is False:
             self._stop_proxy(proxy)
-            self._stop_capture(cap, cap_f)
+            self._stop_capture(cap)
             return (False, "System Failure")
 
-        self._stop_capture(cap, cap_f)
+        self._stop_capture(cap)
 
         # Evaluate Results
         print "Download Time " + str(res[1])
@@ -451,15 +450,12 @@ class CCTester:
     def _start_capture(self):
         self.last_cap = ""
         if not self.do_capture:
-            return None,None
+            return None
 
         #Generate Capture Name
         time_str = time.strftime(config.captures_time_str)
         fname=config.captures_loc.format(tm=time_str,exe=self.instance)
         self.last_cap = fname
-
-        #Open Capture file
-        f = open(fname,"w")
 
         #Generate capture command
         cmd = config.capture_cmd
@@ -471,40 +467,40 @@ class CCTester:
         #Start Capture
         cap = None
         try:
-                cap = shell.spawn(["/bin/bash", "-i", "-c", cmd], store_pid=True, allow_error=True,stdout=f)
+                cap = shell.spawn(["/bin/bash", "-i", "-c", cmd], store_pid=True, allow_error=True)
                 if not cap.is_running():
                     res = proxy.wait_for_result()
                     self.log.write("Capture Failed to Start: " +  res.stderr_output)
-                    f.close()
-                    return None,None
+                    return None
         except Exception as e:
             print e
             self.log.write("Exception: " + str(e) + "\n")
             self.log.flush()
-            f.close()
-            return None,None
+            return None
 
-        return cap,f
+        return cap
 
 
-    def _stop_capture(self, cap, f):
-        if not cap or not f:
+    def _stop_capture(self, cap):
+        if not cap:
             return True
 
-        cap.send_signal(2)
+        ts = time.time()
         
-        #Start SSH Shell
+        #Kill tcpdump
         shell = spur.SshShell(hostname = mv.vm2ip(self.tc[0]),username = config.vm_user,
                                   missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
         try:
                 shell.run(["/bin/bash", "-i", "-c", config.capture_kill_cmd], allow_error=True)
         except Exception as e:
             pass
-
         cap.wait_for_result()
-        f.close()
 
         if len(self.last_cap) > 0:
+            os.system("scp -q -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no %s@%s:/root/capture.dmp %s\n" %
+                        (config.vm_ssh_key, config.vm_user, mv.vm2ip(self.tc[0]), self.last_cap))
             os.system("gzip " + self.last_cap)
             self.last_cap += ".gz"
+
+        self.log.write('[timer] Stop Capture: %f sec.\n' % (time.time() - ts))
         return True

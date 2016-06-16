@@ -11,7 +11,7 @@ currently_testing = "Windows 95"
 do_capture = True
 captures_loc = system_home + "/captures/{tm}-e{exe}.dmp"
 captures_time_str = "%Y-%m-%d-%H-%M-%S"
-capture_cmd = "tcpdump -i eth2 -s64 -U -w - tcp"
+capture_cmd = "tcpdump -i eth2 -s84 -w - tcp > /root/capture.dmp"
 capture_kill_cmd = "pkill tcpdump"
 
 
