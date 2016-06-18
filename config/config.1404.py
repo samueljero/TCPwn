@@ -1,11 +1,12 @@
 # SDN Testing Config File
 # Python syntax
 import os
+import socket
 
 #Global
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 logs_loc = system_home + "/logs/inst{instance}.log"
-currently_testing = "Windows 95"
+currently_testing = "Ubuntu 14.04"
 
 #Captures
 do_capture = True
@@ -39,15 +40,15 @@ coord_log = system_home + "/logs/coord.log"
 coord_results_log = system_home + "/logs/results.log"
 email_on_system_fail = True
 dst_email_address = "samuel.jero@gmail.com"
-src_email_address = "cctester@sound.cs.purdue.edu"
+src_email_address = "cctester@" + socket.getfqdn()
 
 
 #VM Section
 vm_path = system_home + "/vms/"
 master_name = "/ubuntu-1404-master.qcow2"
-vm_name_bases = ["client", "client","windows95-server","server", "tc"]
+vm_name_bases = ["client", "client","server","server", "tc"]
 vm_net = [["tap-n{n}-b1-h0"],["tap-n{n}-b1-h1"],["tap-n{n}-b2-h0"],["tap-n{n}-b2-h1"],["tap-n{n}-b1-h2","tap-n{n}-b2-h2"]]
-vm_has_ssh = [True,True,False,True]
+vm_has_ssh = [True,True,True,True,True]
 vm_user = "root"
 vm_ip_base = "10.0.1.{0}"
 vm_ram = "2048"
