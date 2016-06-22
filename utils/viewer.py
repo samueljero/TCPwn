@@ -14,6 +14,7 @@ prior_log_choice = "yes"
 prior_capture_choice = "yes"
 prior_term_choice = "yes"
 prior_raw_choice = "yes"
+prior_categorize_choice = "yes"
 term_type = ""
 opt_break = True
 
@@ -116,8 +117,8 @@ def query_next():
 		else:
 			sys.stdout.write("Invalid Response. Try Again.\n")
 
-def handle_strat(result, ln_no, executor_files, capture_directory):
-	global prior_log_choice, prior_capture_choice, prior_term_choice, prior_raw_choice, term_type, opt_break
+def handle_strat(result, ln_no, executor_files, capture_directory, out):
+	global prior_log_choice, prior_capture_choice, prior_term_choice, prior_raw_choice, prior_categorize_choice, term_type, opt_break
 	#Components
 	res = result[0]
 	time = result[1]
@@ -179,6 +180,23 @@ def handle_strat(result, ln_no, executor_files, capture_directory):
 		print strat
 	else:
 		prior_raw_choice = "no"
+
+	#Output
+	if query_yes_no("Categorize?", prior_categorize_choice):
+		prior_categorize_choice = "yes"
+		cat = raw_input("Category: ").strip().upper()
+		details = raw_input("Details: ").strip()
+		info = []
+		info.append(cat)
+		info.append(result[1])
+		info.append(result[2])
+		info.append(result[3])
+		info.append(split(cap)[1])
+		info.append(details)
+		out.write(repr(info))
+		out.flush()		
+	else:
+		prior_categorize_choice = "no"
 	return
 
 def main(args):
@@ -188,6 +206,7 @@ def main(args):
 	argp = argparse.ArgumentParser(description='Testing Results Viewer')
 	argp.add_argument('logs', help="Log directory")
 	argp.add_argument('captures', help="Captures directory")
+	argp.add_argument('out_file', help="Categorized Output File")
 	args = vars(argp.parse_args(args[1:]))
 
 	#Find Available Terminal
@@ -223,6 +242,14 @@ def main(args):
 		sys.exit()
 	capturedirectory = args['captures']
 
+
+	#Open Output File
+	try:
+		outfile = open(args['out_file'], "a")
+	except Exception as e:
+		print "Error: could not open output file"
+		sys.exit(1)
+
 	# Read Results file
 	flines = resultfile.readlines()
 	resultfile.close()
@@ -245,7 +272,7 @@ def main(args):
 			i += 1
 			continue
 
-		handle_strat(result, i, instfiles, capturedirectory)
+		handle_strat(result, i, instfiles, capturedirectory, outfile)
 
 		r = query_next()
 		if r[0] == "n":
@@ -262,6 +289,8 @@ def main(args):
 			i = r[1]
 		elif r[0] == "q":
 			break
+
+	outfile.close()
 	return 0
 
 
