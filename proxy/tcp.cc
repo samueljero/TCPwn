@@ -297,6 +297,11 @@ pkt_info TCP::PerformDivision(pkt_info pk, Message hdr, tcp_half &old_src)
 		return pk;
 	}
 
+	if (!old_src.have_initial_ack) {
+		/* old_src is uninitialized! (First ACK) */
+		return pk;
+	}
+
 	/* Sequence range to divide */
 	diff = seq_diff(ack,old_src.high_ack);
 
