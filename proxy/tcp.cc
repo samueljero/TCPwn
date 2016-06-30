@@ -122,7 +122,7 @@ pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &
 
 	if (do_div && in_pkt_range(total_pkts,div_start,div_stop)) {
 		pk = PerformDivision(pk,hdr,old_src);
-	} else if (do_dup && in_pkt_range(total_pkts,div_start,div_stop)) {
+	} else if (do_dup && in_pkt_range(total_pkts,dup_start,dup_stop)) {
 		pk = PerformDup(pk,hdr);
 	} else if (do_burst && in_pkt_range(total_pkts,burst_start,burst_stop)) {
 		pk = PerformBurst(pk,hdr);
