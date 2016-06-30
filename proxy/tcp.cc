@@ -345,7 +345,7 @@ pkt_info TCP::PerformDivision(pkt_info pk, Message hdr, tcp_half &old_src)
 
 pkt_info TCP::PerformDup(pkt_info pk, Message hdr)
 {
-	for(int i = 0; i < dup_num; i++) {
+	for(int i = 0; i < dup_num + 1; i++) {
 		/* Send */
 		//dbgprintf(2, "Sending DUP ack\n");
 		Attacker::get().fixupAndSend(pk,hdr,true);
