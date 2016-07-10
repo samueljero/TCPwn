@@ -33,6 +33,8 @@ static bool is_pure_ack(struct tcphdr* tcph, Message hdr)
 {
 	return (tcph->th_flags & TH_ACK) && 
 			!(tcph->th_flags & TH_SYN) &&
+			!(tcph->th_flags & TH_FIN) &&
+			!(tcph->th_flags & TH_RST) &&
 			tcph->th_off*4 == hdr.len;
 }
 
