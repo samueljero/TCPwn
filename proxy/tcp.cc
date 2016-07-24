@@ -236,7 +236,7 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &d
 		if (!src.preack_save) {
 			src.preack_save = ack;
 		}
-		if (SEQ_AFTER((uint32_t)ack + preack_amt, dst.high_seq)) {
+		if (SEQ_AFTER((uint32_t)src.preack_save + preack_amt, dst.high_seq)) {
 			src.preack_save = dst.high_seq + 1;
 			tcph->th_ack = htonl(src.preack_save);
 		} else {
