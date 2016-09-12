@@ -566,7 +566,7 @@ pkt_info Attacker::fixupAndSend(pkt_info pk, Message ip_payload, bool dosend)
 	pk.msg = m;
 
 	if (dosend) {
-		pk.snd->sendm(pk.msg);
+		pk.snd->sendm(pk.msg, true);
 	}
 	return pk;
 }
