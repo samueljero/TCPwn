@@ -78,7 +78,7 @@ selfish_receiver_actions = [
  [ "DUP", dup_param_template, dup_param_full, dup_param_small],
  [ "BURST", burst_param_template, burst_param_full, burst_param_small],
  [ "PREACK", preack_param_template, preack_param_full, preack_param_small],
- [ "RENEGE", renege_param_template, renege_param_full, renege_param_small],
+ #[ "RENEGE", renege_param_template, renege_param_full, renege_param_small],
 ]
 
 
