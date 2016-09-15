@@ -93,9 +93,22 @@ pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &
 		return pk;
 	}
 
-	/* Initialize addresses if needed */
+	/* Initialize addresses and ports */
 	if (dst.port == 0) {
-		init_conn_info(pk,tcph,src,dst);		
+		if (tcph->th_flags & TH_SYN) {
+			init_conn_info(pk,tcph,src,dst);
+			dbgprintf(1, "Connection: src: %i, dst: %i\n", src.port, dst.port);
+		} else {
+			dbgprintf(1, "Skipping packet from unknown connection... src: %u, dst:%u\n", ntohs(tcph->th_sport), ntohs(tcph->th_dport));
+			return pk;
+		}
+	}
+
+	/* Ignore packets from unexpected ports */
+	if (ntohs(tcph->th_sport) != src.port ||
+	    ntohs(tcph->th_dport) != dst.port) {
+		dbgprintf(1, "Skipping packet from other connection... src: %u, dst:%u\n", ntohs(tcph->th_sport), ntohs(tcph->th_dport));
+		return pk;
 	}
 
 	memcpy(&old_src,&src,sizeof(tcp_half));
@@ -188,6 +201,11 @@ void TCP::update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src)
 	}
 	if (src.have_initial_ack && (tcph->th_flags & TH_ACK) && SEQ_AFTERQ(ntohl(tcph->th_ack),src.high_ack)) {
 		src.high_ack = ntohl(tcph->th_ack);
+		if (ntohl(tcph->th_ack) == src.high_ack) {
+			src.dup++;
+		} else {
+			src.dup = 0;
+		}
 	}
 
 	/* Update Window */
@@ -242,6 +260,11 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &d
 		} else {
 			src.preack_save = src.preack_save + preack_amt;
 			tcph->th_ack = htonl(src.preack_save);
+		}
+	} else if (preack_method == 2) {
+		/* Always Ack highest possible value */
+		if (dst.have_initial_seq) {
+			tcph->th_ack = htonl(dst.high_seq + 1);
 		}
 	}
 

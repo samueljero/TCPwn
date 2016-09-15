@@ -25,6 +25,7 @@ class tcp_half {
 	unsigned long high_ack;
 	unsigned long window;
 	unsigned long pkts;
+	unsigned long dup;
 	uint32_t renege_save;
 	uint32_t preack_save;
 };
