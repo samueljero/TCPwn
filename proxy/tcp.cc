@@ -262,6 +262,23 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &d
 			tcph->th_ack = htonl(src.preack_save);
 		}
 	} else if (preack_method == 2) {
+		/* Always Ack highest possible value, but avoid dup acks */
+		if (dst.have_initial_seq) {
+			if (ack == dst.high_seq + 1) {
+				src.preack_save = dst.high_seq + 1;
+				tcph->th_ack = htonl(dst.high_seq+1);
+			} else if (SEQ_AFTER((uint32_t)dst.high_seq - 100, src.preack_save)) {
+				src.preack_save = dst.high_seq - 100;
+				tcph->th_ack = htonl(dst.high_seq - 100);
+			} else if (SEQ_AFTER((uint32_t)src.preack_save, dst.high_seq)) {
+				src.preack_save = dst.high_seq + 1;
+				tcph->th_ack = htonl(src.preack_save);
+			} else {
+				src.preack_save += 1;
+				tcph->th_ack = htonl(src.preack_save);
+			}
+		}
+	} else if (preack_method == 3) {
 		/* Always Ack highest possible value */
 		if (dst.have_initial_seq) {
 			tcph->th_ack = htonl(dst.high_seq + 1);
