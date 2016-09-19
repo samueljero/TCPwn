@@ -20,6 +20,7 @@ sys.path.insert(1, lib_path)
 sys.path.insert(0, config_path)
 import config
 import spur
+from scapy.all import *
 
 
 
@@ -118,9 +119,13 @@ class CCTester:
 
         self._stop_capture(cap)
 
+        if self.do_capture:
+            res = (res[0],self._process_capture())
+            self._compress_capture()
+
         # Evaluate Results
-        print "Download Time " + str(res[1])
-        self.log.write("Download Time " + str(res[1]) + "\n")
+        print "Transfer Time " + str(res[1])
+        self.log.write("Transfer Time " + str(res[1]) + "\n")
         self.last_result = res[1]
         if self.result_low_threshold > 0 and self.result_high_threshold > 0:
             if self.last_result < self.result_low_threshold:
@@ -499,8 +504,33 @@ class CCTester:
         if len(self.last_cap) > 0:
             os.system("scp -q -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no %s@%s:/root/capture.dmp %s\n" %
                         (config.vm_ssh_key, config.vm_user, mv.vm2ip(self.tc[0]), self.last_cap))
-            os.system("gzip " + self.last_cap)
-            self.last_cap += ".gz"
 
         self.log.write('[timer] Stop Capture: %f sec.\n' % (time.time() - ts))
         return True
+
+
+    def _process_capture(self):
+        f = PcapReader(self.last_cap)
+   
+        start_time = 0
+        end_time = 0
+        p = f.read_packet()
+        while p != None:
+            if p.haslayer(TCP) and p.haslayer(IP):
+                if p[IP].src == config.target_server_ip or p[IP].dst == config.target_server_ip:
+                    if p[TCP].flags & 0x2 > 0 and start_time < 10:
+                        start_time = p.time
+                    if (p[IP].len - p[IP].ihl*4 - p[TCP].dataofs*4) > 0 and p[TCP].flags & 0x1 == 0:
+                        end_time = p.time
+            p = f.read_packet()
+        f.close()
+
+        if start_time < 10 or end_time < 10:
+            return 240
+        return end_time - start_time
+
+
+    def _compress_capture(self):
+            os.system("gzip " + self.last_cap)
+            self.last_cap += ".gz"
+

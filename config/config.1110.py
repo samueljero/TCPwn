@@ -7,6 +7,7 @@ import socket
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 logs_loc = system_home + "/logs/inst{instance}.log"
 currently_testing = "Ubuntu 11.10"
+protocol = "TCP"
 
 #Captures
 do_capture = True
@@ -27,10 +28,14 @@ proxy_kill_cmd = "pkill proxy"
 
 #Servers
 server_start_cmd = "service apache2 restart"
+target_server_ip = "10.0.3.3"
+background_server_ip = "10.0.3.4"
 
 #Clients
 background_client_cmd = "curl -o /dev/null -m 240 http://10.0.3.4/bigfile"
 main_client_cmd = "curl -o /dev/null -m 240 http://10.0.3.3/smallfile"
+target_client_ip = "10.0.3.1"
+background_client_ip = "10.0.3.2"
 
 #Coordinator
 coordinator_port = 3333
