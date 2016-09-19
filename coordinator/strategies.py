@@ -80,9 +80,9 @@ class StrategyGenerator:
                 return
 
 	def build_strategies(self):
-                src_ip = "10.0.3.1"
-                dst_ip = "10.0.3.3"
-                proto = "TCP"
+                src_ip = config.target_client_ip
+                dst_ip = config.target_server_ip
+                proto = config.protocol
 
                 #Single Action strategies
                 for action,template,params,ignore in manipulations.selfish_receiver_actions:
