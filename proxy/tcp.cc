@@ -196,7 +196,7 @@ void TCP::update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src)
 
 	/* Update sequence and ack numbers */
 	//TODO: How do we handle SACK?
-	if (src.have_initial_seq && SEQ_AFTERQ(ntohl(tcph->th_seq),src.high_seq)) {
+	if (src.have_initial_seq && SEQ_AFTERQ(ntohl(tcph->th_seq),src.high_seq) && !(tcph->th_flags & TH_SYN)) {
 		src.high_seq = ntohl(tcph->th_seq) + (hdr.len - tcph->th_off*4)-1;
 	}
 	if (src.have_initial_ack && (tcph->th_flags & TH_ACK) && SEQ_AFTERQ(ntohl(tcph->th_ack),src.high_ack)) {
@@ -264,7 +264,7 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &d
 	} else if (preack_method == 2) {
 		/* Always Ack highest possible value, but avoid dup acks */
 		if (dst.have_initial_seq) {
-			if (ack == dst.high_seq + 1) {
+			if (ack == dst.high_seq + 1 || src.preack_save == 0) {
 				src.preack_save = dst.high_seq + 1;
 				tcph->th_ack = htonl(dst.high_seq+1);
 			} else if (SEQ_AFTER((uint32_t)dst.high_seq - 100, src.preack_save)) {
