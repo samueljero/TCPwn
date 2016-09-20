@@ -3,6 +3,7 @@
 /tmp/*.log.*
 /proxy/sndcmd
 /proxy/proxy
+executor/libs/scapy/VERSION
 
 # Temporary
 *~

@@ -32,7 +32,7 @@ target_server_ip = "10.0.3.3"
 background_server_ip = "10.0.3.4"
 
 #Clients
-background_client_cmd = "curl -o /dev/null -m 240 http://10.0.3.4/bigfile"
+background_client_cmd = "curl -o /dev/null -m 240 http://10.0.3.4/smallfile"
 main_client_cmd = "curl -o /dev/null -m 240 http://10.0.3.3/smallfile"
 target_client_ip = "10.0.3.1"
 background_client_ip = "10.0.3.2"

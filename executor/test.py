@@ -117,9 +117,9 @@ class CCTester:
             self._stop_capture(cap)
             return (False, "System Failure")
 
-        self._stop_capture(cap)
-
+        #Stop and Process Capture
         if self.do_capture:
+            self._stop_capture(cap)
             res = (res[0],self._process_capture())
             self._compress_capture()
 
@@ -264,6 +264,7 @@ class CCTester:
             print "Background traffic command failed: %s %s" % (ret.output, ret.stderr_output)
             self.log.write("Background traffic command failed: %s %s\n" % (ret.output, ret.stderr_output))
             return False, 0
+        bts = time.time()
 
         #Start main traffic
         shell = spur.SshShell(hostname=mv.vm2ip(self.clients[0]), username=config.vm_user,
@@ -271,28 +272,42 @@ class CCTester:
         mts = time.time()
         ret = None
         speed = 0
-        try:
-            ret = shell.run(["/bin/bash", "-i", "-c", config.main_client_cmd],allow_error=True)
-        except Exception as e:
-            print "Main Traffic Command failed: " + str(e)
-            self.log.write("Main Traffic Command Failed: " + str(e) + "\n")
+        bspeed = 0
+        main = shell.spawn(["/bin/bash", "-i", "-c", config.main_client_cmd],store_pid=True,allow_error=True)
+        if not main.is_running():
+            ret = main.wait_for_result()
+            print "Main Traffic Command failed: %s %s" % (ret.output, ret.stderr_output)
+            self.log.write("Main Traffic Command Failed: %s %s\n" % (ret.output,ret.stderr_output))
             try:
                 background.send_signal(2)
             except Exception as e:
                 pass
             return False, 0
+
+        #Wait to finish
+        while background.is_running() or main.is_running():
+            if background.is_running():
+                bspeed = time.time() - bts
+            if main.is_running():
+                speed = time.time()  - mts
+            time.sleep(0.1)
+
+        #Check Main Return code
+        ret = main.wait_for_result()
         if ret.return_code is not 0:
             self.log.write("Main Traffic Command Failed! Return Code: %d\n" % (ret.return_code))
             print "Main Traffic Command Failed! Return Code: %d" % (ret.return_code)
             speed = 240
-        else:
-            speed = time.time() - mts
         self.log.write("Main Traffic command output: \n" + ret.stderr_output)
 
-        #Wait for background traffic to finish
-        while background.is_running():
-              time.sleep(0.5)
-        self.log.write("Background Traffic command output: \n" + background.wait_for_result().stderr_output)
+        #Check Background Return code
+        ret = background.wait_for_result()
+        if ret.return_code is not 0:
+            self.log.write("Background Traffic Command Failed! Return Code: %d\n" % (ret.return_code))
+            print "Background Traffic Command Failed! Return Code: %d" % (ret.return_code)
+            bspeed = 240
+        self.log.write("Background Traffic command output: \n" + ret.stderr_output)
+
         return True, speed
 
     def _stop_proxy(self, proxy):
@@ -514,14 +529,17 @@ class CCTester:
    
         start_time = 0
         end_time = 0
+        last_time = 0
         p = f.read_packet()
         while p != None:
             if p.haslayer(TCP) and p.haslayer(IP):
                 if p[IP].src == config.target_server_ip or p[IP].dst == config.target_server_ip:
                     if p[TCP].flags & 0x2 > 0 and start_time < 10:
                         start_time = p.time
-                    if (p[IP].len - p[IP].ihl*4 - p[TCP].dataofs*4) > 0 and p[TCP].flags & 0x1 == 0:
-                        end_time = p.time
+                    if (p[IP].len - p[IP].ihl*4 - p[TCP].dataofs*4) > 0:
+                        if p.time - last_time < 1:
+                            end_time = p.time
+                        last_time = p.time
             p = f.read_packet()
         f.close()
 

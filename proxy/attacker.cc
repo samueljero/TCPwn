@@ -29,6 +29,8 @@ using namespace std;
 #define ATTACKER_ROW_NUM_FIELDS		7
 #define ATTACKER_ARGS_DELIM		'&'
 
+#define ACTION_ALIAS_ACTIVE		"ACTIVE"
+#define ACTION_ALIAS_TIME		"TIME"
 #define ACTION_ALIAS_INJECT 	"INJECT"
 #define ACTION_ALIAS_DIV 		"DIV"
 #define ACTION_ALIAS_DUP		"DUP"
@@ -54,6 +56,8 @@ Attacker::Attacker()
 {
 	ipv4_id = 42;
 	pthread_rwlock_init(&lock, NULL);
+	pthread_mutex_init(&time_lock, NULL);
+	gettimeofday(&last_pkt, NULL);
 }
 Attacker::~Attacker()
 {
@@ -140,6 +144,13 @@ bool Attacker::addCommand(Message m, Message *resp)
 		dbgprintf(0,"Adding Command: failed to parse arguments \"%s\"\n", fields[6]);
 		ret = false;
 		goto out;
+	}
+
+	/* Is there current activity? */
+	if (ip_src == IP_WILDCARD && ip_dst == IP_WILDCARD && action_type == ACTION_ID_ACTIVE) {
+		/* We don't need the lock here! */
+		last_packet(resp);
+		goto cleanargs;
 	}
 
 	/*take lock */
@@ -308,6 +319,9 @@ bool Attacker::addCommand(Message m, Message *resp)
 		case ACTION_ID_CLEAR:
 			obj->Clear();
 			break;
+		case ACTION_ID_TIME:
+			get_conn_duration(obj, resp);
+			break;
 	}
 
 	if (ret) {
@@ -317,12 +331,7 @@ bool Attacker::addCommand(Message m, Message *resp)
 unlock:
 	/*release lock*/
 	pthread_rwlock_unlock(&lock);
-
-	/* No return messages*/
-	if (resp->buff != NULL) {
-		resp->buff = NULL;
-	}
-
+cleanargs:
 	args_free(args);
 out:
 	csv_free(fields);
@@ -427,6 +436,8 @@ int Attacker::normalize_action_type(char *s)
 		if (ret < ACTION_ID_MIN || ret > ACTION_ID_MAX) return ACTION_ID_ERR;
 		return ret;
 	}
+	if (!strcmp(ACTION_ALIAS_ACTIVE,s)) return ACTION_ID_ACTIVE;
+	if (!strcmp(ACTION_ALIAS_TIME,s)) return ACTION_ID_TIME;
 	if (!strcmp(ACTION_ALIAS_INJECT,s)) return ACTION_ID_INJECT;
 	if (!strcmp(ACTION_ALIAS_DIV,s)) return ACTION_ID_DIV;
 	if (!strcmp(ACTION_ALIAS_DUP,s)) return ACTION_ID_DUP;
@@ -534,6 +545,12 @@ pkt_info Attacker::doAttack(pkt_info pk)
 	Message m;
 
 	pthread_rwlock_rdlock(&lock);
+
+	gettimeofday(&pk.time, NULL);
+	if (pthread_mutex_trylock(&time_lock) == 0) {
+		memcpy((char*)&last_pkt, (char*)&pk.time, sizeof(timeval));
+		pthread_mutex_unlock(&time_lock);
+	}
 
 	if (proxy_debug > 2) {
 		print(pk);
@@ -762,4 +779,49 @@ bool Attacker::start()
 bool Attacker::stop()
 {
 	return true;
+}
+
+void Attacker::last_packet(Message *res)
+{
+	if (res == NULL) {
+		return;
+	}
+
+	res->alloc = 100;
+	res->buff = (char*) malloc(res->alloc);
+	if (res->buff == NULL) {
+		dbgprintf(0, "Error: Cannot allocate memmory!\n");
+		res->alloc = 0;
+		return;
+	}
+
+	pthread_mutex_lock(&time_lock);
+
+	res->len = snprintf(res->buff,res->alloc, "%ld.%06ld\n", last_pkt.tv_sec, last_pkt.tv_usec);
+
+	pthread_mutex_unlock(&time_lock);
+	return;
+}
+
+void Attacker::get_conn_duration(Proto *obj, Message *res)
+{
+	timeval tm;
+
+	if (obj == NULL || res == NULL) {
+		return;
+	}
+
+	memset((char*)&tm,0,sizeof(timeval));
+	obj->GetDuration(&tm);
+	
+	res->alloc = 100;
+	res->buff = (char*) malloc(res->alloc);
+	if (res->buff == NULL) {
+		dbgprintf(0, "Error: Cannot allocate memmory!\n");
+		res->alloc = 0;
+		return;
+	}
+
+	res->len = snprintf(res->buff,res->alloc, "%ld.%06ld\n", tm.tv_sec, tm.tv_usec);
+	return;
 }

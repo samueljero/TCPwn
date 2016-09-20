@@ -11,18 +11,21 @@
 #include <list>
 #include <vector>
 #include <string>
+#include <sys/time.h>
 
 #define ACTION_ID_ERR			(-1)
 #define ACTION_ID_MIN			0
-#define ACTION_ID_INJECT		0
-#define ACTION_ID_DIV			1
-#define ACTION_ID_DUP			2
-#define ACTION_ID_PREACK		3
-#define ACTION_ID_RENEGE		4
-#define ACTION_ID_BURST			5
-#define ACTION_ID_PRINT			6
-#define ACTION_ID_CLEAR			7
-#define ACTION_ID_MAX			7
+#define ACTION_ID_ACTIVE		0
+#define ACTION_ID_TIME			1
+#define ACTION_ID_INJECT		2
+#define ACTION_ID_DIV			3
+#define ACTION_ID_DUP			4
+#define ACTION_ID_PREACK		5
+#define ACTION_ID_RENEGE		6
+#define ACTION_ID_BURST			7
+#define ACTION_ID_PRINT			8
+#define ACTION_ID_CLEAR			9
+#define ACTION_ID_MAX			9
 
 #define PROTO_ID_ERR (-1)
 #define PROTO_ID_MIN 0
@@ -64,6 +67,8 @@ class Attacker{
 		Proto* find_proto(uint32_t src, uint32_t dst);
 		Proto* create_proto(uint32_t src, uint32_t dst, int proto);
 		bool clear_connections();
+		void last_packet(Message *res);
+		void get_conn_duration(Proto *obj, Message *res);
 
 		void print(pkt_info pk);
 	
@@ -71,6 +76,9 @@ class Attacker{
 		std::map<uint32_t,std::map<uint32_t,Proto*> > connections;
 		int ipv4_id;
 		pthread_rwlock_t lock;
+
+		timeval last_pkt;
+		pthread_mutex_t time_lock;
 };
 
 

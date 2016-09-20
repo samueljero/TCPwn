@@ -40,6 +40,7 @@ class pkt_info {
 		Message msg;
 		enum direction dir;
 		int ip_type;
+		timeval time;
 		char *ip_src;
 		char *ip_dst;
 		char *mac_src;

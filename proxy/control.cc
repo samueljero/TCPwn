@@ -63,6 +63,7 @@ void Control::run()
 			continue;
 		}
 		resp.buff = NULL;
+		resp.alloc = 0;
 		resp.len = 0;
 
 		/*Convert to string*/

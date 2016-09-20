@@ -40,6 +40,7 @@ class Proto {
 		virtual bool SetBurst(unsigned long start, unsigned long stop, int num) = 0;
 		virtual bool Clear() = 0;
 		virtual bool SetPrint(bool on) = 0;
+		virtual bool GetDuration(timeval *tm) = 0;
 };
 
 #endif

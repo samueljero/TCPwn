@@ -59,11 +59,13 @@ TCP::TCP(uint32_t src, uint32_t dst)
 	do_print = false;
 
 	pthread_mutex_init(&burst_mutex, NULL);
+	pthread_mutex_init(&lock, NULL);
 }
 
 TCP::~TCP()
 {
 	pthread_mutex_destroy(&burst_mutex);
+	pthread_mutex_destroy(&lock);
 }
 
 pkt_info TCP::new_packet(pkt_info pk, Message hdr)
@@ -77,6 +79,15 @@ pkt_info TCP::new_packet(pkt_info pk, Message hdr)
 	return pk;
 }
 
+pkt_info TCP::drop(pkt_info pk) {
+	if (pk.valid && pk.msg.buff != NULL) {
+		free(pk.msg.buff);
+	}
+	memset(&pk,0,sizeof(pkt_info));
+	pk.valid = false;
+	pk.msg.buff = NULL;
+	return pk;
+}
 
 pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &dst)
 {
@@ -113,6 +124,7 @@ pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &
 
 	memcpy(&old_src,&src,sizeof(tcp_half));
 	update_conn_info(tcph,hdr,src);
+	update_conn_times(tcph,hdr,pk,src,dst);
 
 	/* debug printing */
 	if (do_print) {
@@ -178,6 +190,11 @@ void TCP::init_conn_info(pkt_info pk, struct tcphdr *tcph, tcp_half &src, tcp_ha
 
 	src.port = ntohs(tcph->th_sport);
 	dst.port = ntohs(tcph->th_dport);
+
+	memcpy((char*)&src.start, (char*)&pk.time, sizeof(timeval));
+	memcpy((char*)&dst.start, (char*)&pk.time, sizeof(timeval));
+	memcpy((char*)&src.last, (char*)&pk.time, sizeof(timeval));
+	memcpy((char*)&dst.last, (char*)&pk.time, sizeof(timeval));
 }
 
 void TCP::update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src)
@@ -234,6 +251,17 @@ void TCP::update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src)
 	}
 }
 
+void TCP::update_conn_times(struct tcphdr *tcph, Message msg, pkt_info pk, tcp_half &src, tcp_half &dst)
+{
+	if ((msg.len - tcph->th_off*4) > 0) {
+		if(pthread_mutex_trylock(&lock) == 0) {
+			memcpy((char*)&src.last, (char*) &pk.time, sizeof(timeval));
+			memcpy((char*)&dst.last, (char*) &pk.time, sizeof(timeval));
+			pthread_mutex_unlock(&lock);
+		}
+	}
+}
+
 pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &dst)
 {
 	struct tcphdr *tcph;
@@ -279,6 +307,15 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &d
 			}
 		}
 	} else if (preack_method == 3) {
+		if (dst.have_initial_seq) {
+			tcph->th_ack = htonl(dst.high_seq + 1);
+
+			if (dst.high_seq == src.preack_save) {
+				return drop(pk);
+			}
+			src.preack_save = dst.high_seq;
+		}
+	} else if (preack_method == 4) {
 		/* Always Ack highest possible value */
 		if (dst.have_initial_seq) {
 			tcph->th_ack = htonl(dst.high_seq + 1);
@@ -693,6 +730,33 @@ bool TCP::SetPrint(bool on)
 	return true;
 }
 
+bool TCP::GetDuration(timeval *tm) {
+	if (tm == NULL) {
+		return false;
+	}
+
+	unsigned long usec;
+	unsigned long sec;
+
+	pthread_mutex_lock(&lock);
+	if (fwd.last.tv_usec < fwd.start.tv_usec) {
+		fwd.last.tv_sec--;
+		fwd.last.tv_usec += 1000000;
+	}
+	usec = fwd.last.tv_usec - fwd.start.tv_usec;
+	sec = fwd.last.tv_sec - fwd.start.tv_sec;
+	pthread_mutex_unlock(&lock);
+
+	if (usec >= 1000000) {
+		sec++;
+		usec -= 1000000;
+	}
+
+	tm->tv_sec = sec;
+	tm->tv_usec = usec;
+	return true;
+}
+
 Injector::Injector(pkt_info pk, Message hdr, inject_info &info)
 {
 	this->pk = pk;
@@ -784,3 +848,4 @@ bool Injector::Stop() {
 
 	return true;
 }
+
