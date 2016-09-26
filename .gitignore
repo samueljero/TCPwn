@@ -4,6 +4,7 @@
 /proxy/sndcmd
 /proxy/proxy
 executor/libs/scapy/VERSION
+/config/config.py
 
 # Temporary
 *~

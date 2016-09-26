@@ -18,7 +18,7 @@ capture_kill_cmd = "pkill tcpdump"
 
 
 #Baselining
-stat_baseline_nrounds = 5
+stat_baseline_nrounds = 20
 
 #Proxy
 proxy_com_port = 1026
@@ -32,8 +32,8 @@ target_server_ip = "10.0.3.3"
 background_server_ip = "10.0.3.4"
 
 #Clients
-background_client_cmd = "curl -o /dev/null -m 240 http://10.0.3.4/bigfile"
-main_client_cmd = "curl -o /dev/null -m 240 http://10.0.3.3/bigfile"
+background_client_cmd = "curl -o /dev/null -m 60 http://10.0.3.4/bigfile"
+main_client_cmd = "curl -o /dev/null -m 60 http://10.0.3.3/bigfile"
 target_client_ip = "10.0.3.1"
 background_client_ip = "10.0.3.2"
 

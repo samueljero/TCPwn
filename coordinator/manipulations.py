@@ -45,18 +45,13 @@ burst_param_small = [
 burst_param_template = "num={0!s}"
 
 
-#amt_to_opt_ack
 preack_param_full = [
-#    100,
-#    1000,
-#    10000,
-    100000,
+    0,
 ]
 preack_param_small = [
-#    1000,
-    100000,
+    0,
 ]
-preack_param_template = "method=2&amt={0!s}"
+preack_param_template = "method=3&amt={0!s}"
 
 
 #amt_to_renege

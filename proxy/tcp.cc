@@ -139,19 +139,19 @@ pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &
 		return pk;
 	}
 
-	if (do_preack && in_pkt_range(total_pkts,preack_start,preack_stop)) {
+	if (do_preack && pk.valid && in_pkt_range(total_pkts,preack_start,preack_stop)) {
 		pk = PerformPreAck(pk,hdr,src,dst);
 		mod = true;
-	} else if (do_renege && in_pkt_range(total_pkts,renege_start,renege_stop)) {
+	} else if (do_renege && pk.valid && in_pkt_range(total_pkts,renege_start,renege_stop)) {
 		pk = PerformRenege(pk,hdr,src);
 		mod = true;
 	}
 
-	if (do_div && in_pkt_range(total_pkts,div_start,div_stop)) {
+	if (do_div && pk.valid && in_pkt_range(total_pkts,div_start,div_stop)) {
 		pk = PerformDivision(pk,hdr,old_src);
-	} else if (do_dup && in_pkt_range(total_pkts,dup_start,dup_stop)) {
+	} else if (do_dup && pk.valid && in_pkt_range(total_pkts,dup_start,dup_stop)) {
 		pk = PerformDup(pk,hdr);
-	} else if (do_burst && in_pkt_range(total_pkts,burst_start,burst_stop)) {
+	} else if (do_burst && pk.valid && in_pkt_range(total_pkts,burst_start,burst_stop)) {
 		pk = PerformBurst(pk,hdr);
 	}
 
