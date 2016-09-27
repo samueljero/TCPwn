@@ -32,8 +32,8 @@ target_server_ip = "10.0.3.3"
 background_server_ip = "10.0.3.4"
 
 #Clients
-background_client_cmd = "curl -o /dev/null -m 60 http://10.0.3.4/bigfile"
-main_client_cmd = "curl -o /dev/null -m 60 http://10.0.3.3/bigfile"
+background_client_cmd = "curl -o /dev/null -m {tm} http://10.0.3.4/bigfile"
+main_client_cmd = "curl -o /dev/null -m {tm} http://10.0.3.3/bigfile"
 target_client_ip = "10.0.3.1"
 background_client_ip = "10.0.3.2"
 
@@ -47,6 +47,10 @@ email_on_system_fail = True
 dst_email_address = "samuel.jero@gmail.com"
 src_email_address = "cctester@" + socket.getfqdn()
 
+#Test
+max_time = 60
+transfer_size = 100*1024*1024
+transfer_multiple = 0.9
 
 #VM Section
 vm_path = system_home + "/vms/"
@@ -54,10 +58,10 @@ master_name = "/ubuntu-1404-master.qcow2"
 vm_name_bases = ["client", "client","server","server", "tc"]
 vm_net = [["tap-n{n}-b1-h0"],["tap-n{n}-b1-h1"],["tap-n{n}-b2-h0"],["tap-n{n}-b2-h1"],["tap-n{n}-b1-h2","tap-n{n}-b2-h2"]]
 vm_has_ssh = [True,True,True,True,True]
+vm_cores =  ["2","2","2","2","4"]
 vm_user = "root"
 vm_ip_base = "10.0.1.{0}"
 vm_ram = "2048"
-vm_cores = "2"
 vm_telnet_base = 10100
 vm_vnc_base = 1
 vm_ssh_key = system_home + "/config/ssh.key"

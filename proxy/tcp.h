@@ -84,6 +84,7 @@ class TCP: public Proto {
 		pkt_info PerformDivision(pkt_info pk, Message hdr, tcp_half &old_src);
 		pkt_info PerformDup(pkt_info pk, Message hdr);
 		pkt_info PerformBurst(pkt_info pk, Message hdr);
+		void FinishBurst();
 		bool BuildPacket(pkt_info &pk, Message &hdr, inject_info &info);
 		Message BuildEthHeader(Message pk, char* src, char* dst, int next);
 		Message BuildIPHeader(Message pk, uint32_t src, uint32_t dst, int next);

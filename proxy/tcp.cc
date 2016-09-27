@@ -153,6 +153,8 @@ pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &
 		pk = PerformDup(pk,hdr);
 	} else if (do_burst && pk.valid && in_pkt_range(total_pkts,burst_start,burst_stop)) {
 		pk = PerformBurst(pk,hdr);
+	} else if (do_burst && !in_pkt_range(total_pkts,burst_start,burst_stop)) {
+		FinishBurst();
 	}
 
 	if (mod && pk.valid && pk.msg.buff) {
@@ -322,6 +324,9 @@ pkt_info TCP::PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &d
 		}
 	}
 
+	/* Update high ACK */
+	src.high_ack = ntohl(tcph->th_ack);
+
 	/* Update checksum */
 	tcph->th_sum = 0;
 	tcph->th_sum = ipv4_pseudohdr_chksum((u_char*)hdr.buff,hdr.len,(u_char*)pk.ip_dst,(u_char*)pk.ip_src,6);
@@ -440,7 +445,6 @@ pkt_info TCP::PerformDup(pkt_info pk, Message hdr)
 
 	return pk;
 }
-
 pkt_info TCP::PerformBurst(pkt_info pk, Message hdr)
 {
 	pthread_mutex_lock(&burst_mutex);
@@ -468,6 +472,27 @@ pkt_info TCP::PerformBurst(pkt_info pk, Message hdr)
 	pk.ip_src = pk.ip_dst = NULL;
 
 	return pk;
+}
+
+
+void TCP::FinishBurst()
+{
+	pthread_mutex_lock(&burst_mutex);
+	if (burst_pkts.size() > 0) {
+			for (list<pair<pkt_info,Message> >::iterator it = burst_pkts.begin(); it != burst_pkts.end(); it++) {
+				/* Send */
+				//dbgprintf(2, "Sending BURST packets!\n");
+				Attacker::get().fixupAndSend(it->first, it->second, true);
+
+				/* Cleanup */
+				free(it->first.msg.buff);
+				it->first.msg.buff = NULL;
+			}
+			burst_pkts.clear();
+	}	
+	pthread_mutex_unlock(&burst_mutex);
+
+	return;
 }
 
 

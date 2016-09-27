@@ -36,10 +36,11 @@ def startvm(num):
             nets = config.vm_net[(num-1)%len(config.vm_net)]
             for i in range(0,len(nets)):
                 tap = nets[i].format(n=net)
-	        nics += " -net nic,model=virtio,macaddr=00:00:00:01:{:02X}:{:02X},vlan={} -net tap,ifname={},downscript=no,script=no,vlan={} ".format(i+1,num,i+2,tap,i+2) 
+	        nics += " -net nic,model=virtio,macaddr=00:00:00:01:{:02X}:{:02X},vlan={} -net tap,ifname={},downscript=no,script=no,vlan={} ".format(i+1,num,i+2,tap,i+2)
     	    vnc="-vnc 127.0.0.1:{0}".format(str(config.vm_vnc_base + num))
+            cpus = config.vm_cores[(num-1)%len(config.vm_cores)]
     	    telnet= config.vm_telnet_base + num
-    	    os.system("qemu-system-x86_64 -hda {0} -m {1} -smp {2} -enable-kvm -k \"en-us\" {3} {4} -monitor telnet:127.0.0.1:{5},server,nowait &".format(img,config.vm_ram,config.vm_cores,nics, vnc,str(telnet)))
+    	    os.system("qemu-system-x86_64 -hda {0} -m {1} -smp {2} -enable-kvm -k \"en-us\" {3} {4} -monitor telnet:127.0.0.1:{5},server,nowait &".format(img,config.vm_ram,cpus,nics, vnc,str(telnet)))
 
 def stopvm(num):
         if vmHasSSH(num):
@@ -79,8 +80,9 @@ def resumevm(num, namebase):
             tap = nets[i].format(n=net)
 	    nics += " -net nic,model=virtio,macaddr=00:00:00:01:{:02X}:{:02X},vlan=0 -net tap,ifname={},downscript=no,script=no,vlan=0 ".format(i+1,num,tap) 
 	vnc="-vnc 127.0.0.1:{0}".format(str(config.vm_vnc_base + num))
+        cpus = config.vm_cores[(num-1)%len(config.vm_cores)]
 	telnet= config.vm_telnet_base + num
-	os.system("qemu-system-x86_64 -hda {0} -m {1} -smp {2} -enable-kvm -k \"en-us\" {3} {4} -monitor telnet:127.0.0.1:{5},server,nowait -daemonize -incoming \"exec:cat {6}\"".format(img,config.vm_ram,config.vm_cores,nics, vnc,str(telnet),filename))
+	os.system("qemu-system-x86_64 -hda {0} -m {1} -smp {2} -enable-kvm -k \"en-us\" {3} {4} -monitor telnet:127.0.0.1:{5},server,nowait -daemonize -incoming \"exec:cat {6}\"".format(img,config.vm_ram,cpus,nics, vnc,str(telnet),filename))
 	if Ping(config.vm_ip_base.format(num), 4) == False:
 		print "Warning: VM {0} is not up!".format(str(num))
 

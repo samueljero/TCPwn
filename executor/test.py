@@ -258,7 +258,7 @@ class CCTester:
         #Start background traffic
         shell = spur.SshShell(hostname=mv.vm2ip(self.clients[1]), username=config.vm_user,
                               missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
-        background = shell.spawn(["/bin/bash", "-i", "-c", config.background_client_cmd],store_pid=True,allow_error=True)
+        background = shell.spawn(["/bin/bash", "-i", "-c", config.background_client_cmd.format(tm=str(config.max_time))],store_pid=True,allow_error=True)
         if not background.is_running():
             ret = background.wait_for_result()
             print "Background traffic command failed: %s %s" % (ret.output, ret.stderr_output)
@@ -273,7 +273,7 @@ class CCTester:
         ret = None
         speed = 0
         bspeed = 0
-        main = shell.spawn(["/bin/bash", "-i", "-c", config.main_client_cmd],store_pid=True,allow_error=True)
+        main = shell.spawn(["/bin/bash", "-i", "-c", config.main_client_cmd.format(tm=str(config.max_time))],store_pid=True,allow_error=True)
         if not main.is_running():
             ret = main.wait_for_result()
             print "Main Traffic Command failed: %s %s" % (ret.output, ret.stderr_output)
@@ -530,6 +530,7 @@ class CCTester:
         start_time = 0
         end_time = 0
         last_time = 0
+        total_data = 0
         p = f.read_packet()
         while p != None:
             if p.haslayer(TCP) and p.haslayer(IP):
@@ -537,6 +538,7 @@ class CCTester:
                     if p[TCP].flags & 0x2 > 0 and start_time < 10:
                         start_time = p.time
                     if (p[IP].len - p[IP].ihl*4 - p[TCP].dataofs*4) > 0:
+                        total_data += (p[IP].len - p[IP].ihl*4 - p[TCP].dataofs*4)
                         if p.time - last_time < 1:
                             end_time = p.time
                         last_time = p.time
@@ -544,7 +546,9 @@ class CCTester:
         f.close()
 
         if start_time < 10 or end_time < 10:
-            return 240
+            return config.max_time
+        if total_data < (config.transfer_size * config.transfer_multiple):
+            return config.max_time
         return end_time - start_time
 
 

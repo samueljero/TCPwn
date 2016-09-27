@@ -7,11 +7,11 @@ div_param_full = [
     1000,
     100,
     10,
-    1
+#    1
 ]
 div_param_small = [
     1000,
-    1,
+    10,
 ]
 div_param_template = "bpc={0!s}"
 
