@@ -41,6 +41,7 @@ class Proto {
 		virtual bool Clear() = 0;
 		virtual bool SetPrint(bool on) = 0;
 		virtual bool GetDuration(timeval *tm) = 0;
+		virtual bool GetBytes(unsigned long *bytes) = 0;
 };
 
 #endif

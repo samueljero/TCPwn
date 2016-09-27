@@ -133,7 +133,8 @@ bool Attacker::addCommand(Message m, Message *resp)
 		ret = false;
 		goto out;
 	}
-	if (action_type != ACTION_ID_CLEAR && (ip_src == IP_WILDCARD || ip_dst == IP_WILDCARD)) {
+	if (action_type != ACTION_ID_CLEAR && action_type != ACTION_ID_ACTIVE && 
+                                            (ip_src == IP_WILDCARD || ip_dst == IP_WILDCARD)) {
 		dbgprintf(0,"Adding Command: bad addresses \"%s\", \"%s\"\n", fields[0],fields[1]);
 		ret = false;
 		goto out;
@@ -806,6 +807,7 @@ void Attacker::last_packet(Message *res)
 void Attacker::get_conn_duration(Proto *obj, Message *res)
 {
 	timeval tm;
+	unsigned long bytes;
 
 	if (obj == NULL || res == NULL) {
 		return;
@@ -813,6 +815,8 @@ void Attacker::get_conn_duration(Proto *obj, Message *res)
 
 	memset((char*)&tm,0,sizeof(timeval));
 	obj->GetDuration(&tm);
+	obj->GetBytes(&bytes);
+
 	
 	res->alloc = 100;
 	res->buff = (char*) malloc(res->alloc);
@@ -822,6 +826,6 @@ void Attacker::get_conn_duration(Proto *obj, Message *res)
 		return;
 	}
 
-	res->len = snprintf(res->buff,res->alloc, "%ld.%06ld\n", tm.tv_sec, tm.tv_usec);
+	res->len = snprintf(res->buff,res->alloc, "%ld.%06ld\n%ld\n", tm.tv_sec, tm.tv_usec, bytes);
 	return;
 }

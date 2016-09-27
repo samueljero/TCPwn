@@ -112,6 +112,7 @@ class CCTester:
     
         # Do Test
         res = self._call_test()
+        res = (res[0], res[1], "")
         if res[0] is False:
             self._stop_proxy(proxy)
             self._stop_capture(cap)
@@ -120,24 +121,29 @@ class CCTester:
         #Stop and Process Capture
         if self.do_capture:
             self._stop_capture(cap)
-            res = (res[0],self._process_capture())
+            #res = self._process_capture()
             self._compress_capture()
+        res = self._query_proxy_conn_info()
+
 
         # Evaluate Results
         print "Transfer Time " + str(res[1])
         self.log.write("Transfer Time " + str(res[1]) + "\n")
         self.last_result = res[1]
-        if self.result_low_threshold > 0 and self.result_high_threshold > 0:
-            if self.last_result < self.result_low_threshold:
-                result[0] = False
-                result[1] = "Performance -- Faster"
-            if self.last_result > self.result_high_threshold:
-                result[0] = False
-                result[1] = "Performance -- Slower"
+        if res[0] is False:
+            result[0] = False
+            result[1] = res[2]
+        else:
+            if self.result_low_threshold > 0 and self.result_high_threshold > 0:
+                if self.last_result < self.result_low_threshold:
+                    result[0] = False
+                    result[1] = "Performance -- Faster"
+                if self.last_result > self.result_high_threshold:
+                    result[0] = False
+                    result[1] = "Performance -- Slower"
 
         # Stop Proxy
-        if self._stop_proxy(proxy) == False:
-            self._stop_controllers()
+        if not self._stop_proxy(proxy):
             return (False, "System Failure")
 
         # Cleanup anything still around
@@ -290,14 +296,24 @@ class CCTester:
                 bspeed = time.time() - bts
             if main.is_running():
                 speed = time.time()  - mts
-            time.sleep(0.1)
+            if self._query_proxy_done():
+                try:
+                    background.send_signal(2)
+                except Exception as e:
+                    pass
+                try:
+                    main.send_signal(2)
+                except Exception as e:
+                    pass
+                break
+            time.sleep(1)
 
         #Check Main Return code
         ret = main.wait_for_result()
         if ret.return_code is not 0:
             self.log.write("Main Traffic Command Failed! Return Code: %d\n" % (ret.return_code))
             print "Main Traffic Command Failed! Return Code: %d" % (ret.return_code)
-            speed = 240
+            speed = config.max_time
         self.log.write("Main Traffic command output: \n" + ret.stderr_output)
 
         #Check Background Return code
@@ -305,7 +321,7 @@ class CCTester:
         if ret.return_code is not 0:
             self.log.write("Background Traffic Command Failed! Return Code: %d\n" % (ret.return_code))
             print "Background Traffic Command Failed! Return Code: %d" % (ret.return_code)
-            bspeed = 240
+            bspeed = config.max_time
         self.log.write("Background Traffic command output: \n" + ret.stderr_output)
 
         return True, speed
@@ -352,7 +368,7 @@ class CCTester:
         strat = ""
         # Default strategy
         if strategy == None:
-            strategy = ["*,*,TCP,0,0,CLEAR,*"]
+            strategy = ["*,*,TCP,0,0,CLEAR,*","{0},{1},{2},0,0,CLEAR,*".format(config.target_client_ip, config.target_server_ip, config.protocol)]
         ts = time.time()
 
         for l in strategy:
@@ -546,13 +562,52 @@ class CCTester:
         f.close()
 
         if start_time < 10 or end_time < 10:
-            return config.max_time
+            return False, 0, "Stalled Connection"
         if total_data < (config.transfer_size * config.transfer_multiple):
-            return config.max_time
-        return end_time - start_time
+            return False, end_time - start_time, "Stalled Connection"
+        return True, end_time - start_time, "Okay"
 
 
     def _compress_capture(self):
             os.system("gzip " + self.last_cap)
             self.last_cap += ".gz"
 
+    def _query_proxy_conn_info(self):
+        length = 0
+        total_data = 0
+        cmd = "{0},{1},{2},0,0,TIME,*".format(config.target_client_ip, config.target_server_ip,config.protocol)
+        for t in self.tc:
+            res = self._proxy_communicate((mv.vm2ip(t), config.proxy_com_port), cmd, wait_for_response=True)
+            if type(res) is bool and res is False:
+                return (False, 0, "System Error")
+            if type(res) is not str:
+                return (False, 0, "System Error")
+            lns = res.split()
+            if len(lns) != 2:
+                return (False,0,"System Error")
+            length = float(lns[0])
+            total_data = int(lns[1])
+
+        if length < 0 or length > 200:
+            return False, length, "Stalled Connection"
+        if total_data < (config.transfer_size * config.transfer_multiple):
+            return False, length, "Stalled Connection"
+        return True, length, "Okay"
+
+
+    def _query_proxy_done(self):
+        last = 0
+        cmd = "*,*,{0},0,0,ACTIVE,*".format(config.protocol)
+        for t in self.tc:
+            res = self._proxy_communicate((mv.vm2ip(t), config.proxy_com_port), cmd, wait_for_response=True)
+            if type(res) is bool and res is False:
+                return False
+            if type(res) is not str:
+                return False
+            last = float(res)
+    
+        if last < 10:
+            return False
+
+        if time.time() - last >= 2:
+            return True

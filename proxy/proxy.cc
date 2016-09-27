@@ -145,7 +145,7 @@ void control_loop(int port)
 			break;
 		}
 
-		dbgprintf(1, "New Control Connection\n");
+		dbgprintf(3, "New Control Connection\n");
 		
 		ctl = new Control(new_sock);
 		ctl->start();
