@@ -450,7 +450,12 @@ class CCTester:
             # Wait for Length
             data = ""
             while (len(data) < 3):
-                data = sock.recv(4, socket.MSG_PEEK)
+                try:
+                    data = sock.recv(4, socket.MSG_PEEK)
+                except Exception as e:
+                    self.log.write("Recv failed: " + str(e) + "\n")
+                    sock.close()
+                    return False
                 if len(data) == 0:
                     sock.close()
                     return False

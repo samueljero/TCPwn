@@ -18,7 +18,7 @@ capture_kill_cmd = "pkill tcpdump"
 
 
 #Baselining
-stat_baseline_nrounds = 60
+stat_baseline_nrounds = 20
 
 #Proxy
 proxy_com_port = 1026
