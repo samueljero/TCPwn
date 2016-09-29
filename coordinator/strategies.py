@@ -65,7 +65,7 @@ class StrategyGenerator:
 				self.failed_lst.append(strat)
 			else:
 				#Final failure, record in result file
-				lst = ["FAILED", str(datetime.today()),strat, reason, feedback['capture']]
+				lst = ["FAILED", str(datetime.today()),strat, reason, feedback['capture'], feedback['last']]
 				self.results.write("%s\n" %(str(lst)))
 				self.results.flush()
 				self.lg.write("[%s] Strategy HARD FAILED: %s\n" % (str(datetime.today()),str(strat)))

@@ -5,6 +5,7 @@
 #bytes_per_ack
 div_param_full = [
     1000,
+    500,
     100,
     10,
 #    1

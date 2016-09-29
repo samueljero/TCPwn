@@ -24,7 +24,7 @@ retry:
 	if ((len = send(sock, m.buff, m.len, MSG_NOSIGNAL)) < 0) {
 		if (errno == ENOBUFS || errno == ENOMEM) {
 			if (allow_drop) {
-				dbgprintf(1, "Packet Dropped due to queuing\n");
+				dbgprintf(3, "Packet Dropped due to queuing\n");
 				return true;
 			} else {
 				if (retries%1000 == 0) {

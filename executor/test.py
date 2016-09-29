@@ -38,6 +38,7 @@ class CCTester:
         self.result_high_threshold = 0
         self.result_low_threshold = 0
         self.last_result = 0
+        self.last_transfer = 0
         self.do_capture = config.do_capture
         self.last_cap = ""
 
@@ -80,7 +81,7 @@ class CCTester:
         self.log.flush()
 
     def retrieve_feedback(self):
-        return {'high':self.result_high_threshold,'low':self.result_low_threshold,'last':self.last_result, 'capture':self.last_cap}
+        return {'high':self.result_high_threshold,'low':self.result_low_threshold,'last':self.last_result, 'bytes':self.last_transfer, 'capture':self.last_cap}
 
     def doTest(self, strategy):
         """
@@ -112,7 +113,7 @@ class CCTester:
     
         # Do Test
         res = self._call_test()
-        res = (res[0], res[1], "")
+        res = (res[0], res[1], config.transfer_size)
         if res[0] is False:
             self._stop_proxy(proxy)
             self._stop_capture(cap)
@@ -128,19 +129,22 @@ class CCTester:
 
         # Evaluate Results
         print "Transfer Time " + str(res[1])
+        print "Data Transfered " + str(res[2])
         self.log.write("Transfer Time " + str(res[1]) + "\n")
+        self.log.write("Data Transfered " + str(res[2]) + "\n")
         self.last_result = res[1]
-        if res[0] is False:
-            result[0] = False
-            result[1] = res[2]
-        else:
-            if self.result_low_threshold > 0 and self.result_high_threshold > 0:
-                if self.last_result < self.result_low_threshold:
+        self.last_transfer = res[2]
+        if self.result_low_threshold > 0 and self.result_high_threshold > 0:
+            if self.last_result < self.result_low_threshold:
+                if self.last_transfer < (config.transfer_size * config.transfer_multiple):
+                    result[0] = False
+                    result[1] = "Stalled Connection"
+                else:
                     result[0] = False
                     result[1] = "Performance -- Faster"
-                if self.last_result > self.result_high_threshold:
-                    result[0] = False
-                    result[1] = "Performance -- Slower"
+            if self.last_result > self.result_high_threshold:
+                result[0] = False
+                result[1] = "Performance -- Slower"
 
         # Stop Proxy
         if not self._stop_proxy(proxy):
@@ -155,6 +159,7 @@ class CCTester:
         self.log.write("Test Result: " + str(result[0]) + ", Reason: " + str(result[1]) + "\n")
         self.log.write("Performance: " + str(self.last_result) + "\n")
         self.log.write("Thresholds: Low " + str(self.result_low_threshold) + ", High " + str(self.result_high_threshold) + "\n")
+        self.log.write("Bytes: " + str(self.last_transfer) + "\n")
         self.log.write("Capture: " + str(self.last_cap) + "\n")
         self.log.write(str(datetime.today()) + "\n")
         self.log.write("##############################Ending Test " +
@@ -567,10 +572,8 @@ class CCTester:
         f.close()
 
         if start_time < 10 or end_time < 10:
-            return False, 0, "Stalled Connection"
-        if total_data < (config.transfer_size * config.transfer_multiple):
-            return False, end_time - start_time, "Stalled Connection"
-        return True, end_time - start_time, "Okay"
+            return False, 0, total_data
+        return True, end_time - start_time, total_data
 
 
     def _compress_capture(self):
@@ -594,10 +597,8 @@ class CCTester:
             total_data = int(lns[1])
 
         if length < 0 or length > 200:
-            return False, length, "Stalled Connection"
-        if total_data < (config.transfer_size * config.transfer_multiple):
-            return False, length, "Stalled Connection"
-        return True, length, "Okay"
+            return False, length, total_data
+        return True, length, total_data
 
 
     def _query_proxy_done(self):
@@ -614,5 +615,5 @@ class CCTester:
         if last < 10:
             return False
 
-        if time.time() - last >= 2:
+        if time.time() - last >= config.test_max_idle:
             return True

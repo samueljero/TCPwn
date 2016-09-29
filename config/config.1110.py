@@ -50,7 +50,8 @@ src_email_address = "cctester@" + socket.getfqdn()
 #Test
 max_time = 60
 transfer_size = 100*1024*1024
-transfer_multiple = 0.9
+transfer_multiple = 0.8
+test_max_idle = 10
 
 #VM Section
 vm_path = system_home + "/vms/"
