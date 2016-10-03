@@ -16,6 +16,7 @@ system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 lib_path = os.path.abspath(os.path.join(system_home, 'executor', 'libs'))
 config_path = os.path.abspath(os.path.join(system_home, 'config'))
 proxy_path = os.path.abspath(os.path.join(system_home, 'proxy'))
+monitor_path = os.path.abspath(os.path.join(system_home, 'monitor'))
 sys.path.insert(1, lib_path)
 sys.path.insert(0, config_path)
 import config
@@ -31,6 +32,7 @@ class CCTester:
         self.clients = [instance*len(config.vm_name_bases)+1, instance*len(config.vm_name_bases)+2]
         self.servers = [instance*len(config.vm_name_bases)+3, instance*len(config.vm_name_bases)+4]
         self.tc = [instance*len(config.vm_name_bases)+5]
+        self.mon = [instance*len(config.vm_name_bases)+6]
         self.log = log
         self.testnum = 1
         self.creating_baseline = False
@@ -41,6 +43,8 @@ class CCTester:
         self.last_transfer = 0
         self.do_capture = config.do_capture
         self.last_cap = ""
+        self.monitor_running = False
+        self.proxy_running = False
 
     def baseline(self):
         self.creating_baseline = True
@@ -96,14 +100,21 @@ class CCTester:
         #Cleanup anything leftover from prior tests
         self._cleanup()
 
+        #Start monitor
+        monitor = self._start_monitor()
+        if monitor is None:
+            return (False, "System Failure")
+
         # Start Proxy
         proxy = self._start_proxy()
         if proxy is None:
+            self._stop_monitor(monitor)
             return (False, "System Failure")
 
         # Send Proxy Strategy
         if self._send_proxy_strategy(strategy) == False:
             self._stop_proxy(proxy)
+            self._stop_monitor(monitor)
             return (False, "System Failure")
 
         #Start capture, if needed
@@ -117,6 +128,7 @@ class CCTester:
         if res[0] is False:
             self._stop_proxy(proxy)
             self._stop_capture(cap)
+            self._stop_monitor(monitor)
             return (False, "System Failure")
 
         #Stop and Process Capture
@@ -150,6 +162,10 @@ class CCTester:
         if not self._stop_proxy(proxy):
             return (False, "System Failure")
 
+        # Stop Monitor
+        if not self._stop_monitor(monitor):
+            return (False, "System Failure")
+
         # Cleanup anything still around
         self._cleanup()
 
@@ -174,7 +190,9 @@ class CCTester:
         for s in self.servers:
             mv.startvm(s)
         for t in self.tc:
-            mv.startvm(t)   
+            mv.startvm(t)
+        for m in self.mon:
+            mv.startvm(m)
         for c in self.clients:
             if(self._waitListening(mv.vm2ip(c), 22, 240, True) == False):
                 print "Error: client VM %d not started!" % (c)
@@ -198,6 +216,22 @@ class CCTester:
                     if proc.return_code is not 0:
                         print "Error: Make failed!"
                         return False
+        for m in self.mon:
+            if(self._waitListening(mv.vm2ip(m), 22, 240, True) == False):
+                print "Error: Monitor VM %d not started!" % (t)
+                return False
+            else:
+                if config.vm_replace_data:
+                    os.system("scp -r -p -i %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r %s %s@%s:~\n" %
+                              (config.vm_ssh_key, monitor_path, config.vm_user, mv.vm2ip(m)))
+                    shell = spur.SshShell(hostname=mv.vm2ip(m), username=config.vm_user,
+                                          missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
+                    proc = shell.run(
+                        ["/bin/bash", "-i", "-c", "cd monitor && make clean && make"])
+                    if proc.return_code is not 0:
+                        print "Error: Make failed!"
+                        return False
+
         return True
 
     def stopVms(self):
@@ -207,6 +241,35 @@ class CCTester:
             mv.stopvm(s)
         for t in self.tc:
             mv.stopvm(t)
+        for m in self.mon:
+            mv.stopvm(m)
+
+    def _start_monitor(self):
+        monitor = None
+        ts = time.time()
+        cmd = config.monitor_cmd.format(port = str(config.monitor_com_port))
+        self.log.write("Monitor CMD: " + cmd + "\n")
+        
+        shell = spur.SshShell(hostname = mv.vm2ip(self.mon[0]),username = config.vm_user,
+                                  missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
+        #Start Proxy
+        monitor = shell.spawn(["/bin/bash", "-i", "-c", cmd], store_pid=True, allow_error=True)
+        if not monitor.is_running():
+            res = monitor.wait_for_result()
+            self.log.write("Monitor Failed to Start: " + res.output + res.stderr_output)
+            return None
+        else:
+            self.log.write("Started monitor on " + str(mv.vm2ip(self.mon[0]))+ "...\n")
+        
+        #Wait for proxy to come up
+        if(self._waitListening(mv.vm2ip(self.mon[0]), config.monitor_com_port, 240, False) == False):
+            self.log.write("Monitor Failed to start after 240 seconds!\n")
+            print "Monitor Failed to Start after 240 seconds!"
+            return None
+        
+        self.log.write('[timer] Start monitor: %f sec.\n' % (time.time() - ts))
+        self.monitor_running = True
+        return monitor
 
     def _start_proxy(self):
         proxy = None
@@ -356,6 +419,31 @@ class CCTester:
         self.proxy_running = False
         return True
 
+    def _stop_monitor(self, monitor):
+        if self.monitor_running is False:
+            return True
+        ts = time.time()
+        
+        #Check whether monitor is still running
+        if not monitor.is_running():
+            print "Monitor has crashed!!!\n"
+            self.log.write("Monitor has crashed!!!\n")
+            self.log.flush()
+            return False
+
+        #Stop monitor
+        monitor.send_signal(2)
+        ret = monitor.wait_for_result()
+
+        #Write Output to Log
+        self.log.write("***** Monitor Output*****\n")
+        self.log.write(ret.stderr_output)
+        self.log.write("***********************\n")
+        self.log.flush()
+        self.log.write('[timer] Stop monitor: %f sec.\n' % (time.time() - ts))
+        self.monitor_running = False
+        return True
+
     def _cleanup(self):
         ts = time.time()
 
@@ -364,6 +452,14 @@ class CCTester:
                                   missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
         try:
             ret = shell.run(["/bin/bash", "-i", "-c", config.proxy_kill_cmd])
+        except Exception as e:
+            return False
+
+        #Kill Monitor
+        shell = spur.SshShell(hostname = mv.vm2ip(self.mon[0]),username = config.vm_user,
+                                  missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
+        try:
+            ret = shell.run(["/bin/bash", "-i", "-c", config.monitor_kill_cmd])
         except Exception as e:
             return False
         self.log.write('[timer] Clean up: %f sec.\n' % (time.time() - ts))

@@ -26,6 +26,11 @@ proxy_cmd = "/root/proxy/proxy -i eth1 -i eth2 -v -p {port}"
 limit_cmd = "/root/proxy/limit.sh"
 proxy_kill_cmd = "pkill proxy"
 
+#Monitor
+monitor_com_port = 4444
+monitor_cmd = "/root/monitor/monitor -i eth1 -i eth2 -v -p {port}"
+monitor_kill_cmd = "pkill monitor"
+
 #Servers
 server_start_cmd = "service apache2 restart"
 target_server_ip = "10.0.3.3"
@@ -50,16 +55,16 @@ src_email_address = "cctester@" + socket.getfqdn()
 #Test
 max_time = 60
 transfer_size = 100*1024*1024
-transfer_multiple = 0.8
+transfer_multiple = 0.7
 test_max_idle = 10
 
 #VM Section
 vm_path = system_home + "/vms/"
 master_name = "/ubuntu-1404-master.qcow2"
-vm_name_bases = ["client", "client","server","server", "tc"]
-vm_net = [["tap-n{n}-b1-h0"],["tap-n{n}-b1-h1"],["tap-n{n}-b2-h0"],["tap-n{n}-b2-h1"],["tap-n{n}-b1-h2","tap-n{n}-b2-h2"]]
-vm_has_ssh = [True,True,True,True,True]
-vm_cores =  ["2","2","2","2","4"]
+vm_name_bases = ["client", "client","server","server", "tc", "track"]
+vm_net = [["tap-n{n}-b1-h0"],["tap-n{n}-b1-h1"],["tap-n{n}-b3-h0"],["tap-n{n}-b2-h1"],["tap-n{n}-b1-h2","tap-n{n}-b2-h2"], ["tap-n{n}-b3-h1","tap-n{n}-b2-h0"]]
+vm_has_ssh = [True,True,True,True,True,True]
+vm_cores =  ["2","2","2","2","4","2"]
 vm_user = "root"
 vm_ip_base = "10.0.1.{0}"
 vm_ram = "2048"
