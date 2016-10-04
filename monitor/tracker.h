@@ -6,6 +6,7 @@
 #define _TRACKER_H
 #include "monitor.h"
 #include "args.h"
+#include "proto.h"
 #include <map>
 #include <list>
 #include <vector>
@@ -21,6 +22,14 @@
 #define PROTO_ID_TCP 0
 #define PROTO_ID_MAX 0
 
+#define STATE_INIT 0
+#define STATE_SLOW_START 1
+#define STATE_CONG_AVOID 2
+#define STATE_FAST_RECOV 3
+#define STATE_END 4
+
+#define INTERVAL 10
+
 
 class Tracker{
 	private:
@@ -35,19 +44,18 @@ class Tracker{
 		bool normalize_mac(char* str, char* raw);
 		bool start();
 		bool stop();
+		bool isRunning() {return proto && proto->isRunning();}
 
 	private:
 		void parseEthernet(pkt_info pk, Message cur);
 		void parseIPv4(pkt_info pk, Message cur);
-		void updateClassicCongestionControl(pkt_info pk, Message cur);
 		int normalize_action_type(char *s);
 		int normalize_proto(char *s);
 		unsigned long normalize_time(char *s);
-
 		void print(pkt_info pk);
-	
-		pthread_rwlock_t lock;
 
+		Proto* proto;
+		pthread_rwlock_t lock;
 };
 
 

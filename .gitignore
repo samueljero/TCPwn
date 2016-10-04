@@ -3,6 +3,8 @@
 /tmp/*.log.*
 /proxy/sndcmd
 /proxy/proxy
+/monitor/sndcmd
+/monitor/monitor
 executor/libs/scapy/VERSION
 /config/config.py
 

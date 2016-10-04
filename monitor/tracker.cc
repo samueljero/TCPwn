@@ -8,6 +8,8 @@
 #include "iface.h"
 #include "csv.h"
 #include "args.h"
+#include "proto.h"
+#include "tcp.h"
 #include <stdarg.h>
 #include <time.h>
 #include <sys/time.h>
@@ -15,6 +17,7 @@
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
+#include <netinet/tcp.h>
 #include <map>
 #include <list>
 #include <vector>
@@ -35,10 +38,14 @@ using namespace std;
 
 Tracker::Tracker()
 {
+	proto = NULL;
 	pthread_rwlock_init(&lock, NULL);
 }
 Tracker::~Tracker()
 {
+	if (proto != NULL) {
+		stop();
+	}
 	pthread_rwlock_destroy(&lock);
 }
 
@@ -301,17 +308,12 @@ void Tracker::parseIPv4(pkt_info pk, Message cur)
 
 	switch(ip->protocol) {
 		case 6: //TCP
-			updateClassicCongestionControl(pk, m);
+			if (proto && proto->hasIPProto(6)) {
+				proto->new_packet(pk,m);
+			}
 			break;
 		default:
 			return;
-	}
-	return;
-}
-
-void Tracker::updateClassicCongestionControl(pkt_info pk, Message cur) {
-	if (pk.ip_src && cur.len > 0) {
-
 	}
 	return;
 }
@@ -321,12 +323,20 @@ void Tracker::print(pkt_info pk)
 	dbgprintf(0,"Packet in direction: %d\n", pk.dir);
 }
 
+
 bool Tracker::start()
 {
+	if (!proto) {
+		proto = new TCP();
+		proto->start();
+	}
 	return true;
 }
 
 bool Tracker::stop()
 {
+	if (proto) {
+		proto->stop();
+	}
 	return true;
 }
