@@ -89,7 +89,6 @@ class TCP: public Proto {
 		Message BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info &info, Message &ip_payload, uint32_t ipsrc, uint32_t ipdst);
 		bool StartInjector(inject_info &info);
 		pkt_info drop(pkt_info pk);
-		void TimevalSub(timeval* s1, timeval *s2, timeval *res);
 
 		tcp_half fwd;
 		tcp_half rev;

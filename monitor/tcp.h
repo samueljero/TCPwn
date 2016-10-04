@@ -17,7 +17,7 @@
 
 #define INTERVAL 10
 
-#define NAGLE true
+#define DELAYED_ACK true
 
 class TCP: public Proto {
 	public:
@@ -32,7 +32,7 @@ class TCP: public Proto {
 	private:
 		static void* thread_run(void* arg);
 		void run();
-		void updateClassicCongestionControl(pkt_info pk, Message hdr);
+		void updateClassicCongestionControl(Message hdr);
 		void processClassicCongestionControl();
 		void printState(int oldstate, int state);
 
@@ -42,19 +42,33 @@ class TCP: public Proto {
 		bool thread_running;
 		bool thread_cleanup;
 
-		unsigned int tcp_port1;
-		unsigned int tcp_port2;
+		unsigned int tcp1_port;
+		unsigned int tcp1_seq_low;
+		unsigned int tcp1_seq_high;
+		unsigned int tcp1_ack_low;
+		unsigned int tcp1_ack_high;
+		unsigned int tcp1_ack_hold;
+		unsigned int tcp2_port;
+		unsigned int tcp2_seq_low;
+		unsigned int tcp2_seq_high;
+		unsigned int tcp2_ack_low;
+		unsigned int tcp2_ack_high;
+		unsigned int tcp2_ack_hold;
+		
 		unsigned int tcp_data_pkts;
+		unsigned int tcp_data_bytes;
 		unsigned int tcp_ack_pkts;
-		unsigned int tcp_data_low;
-		unsigned int tcp_data_high;
-		unsigned int tcp_ack_low;
-		unsigned int tcp_ack_high;
+		unsigned int tcp_ack_bytes;
+		unsigned int tcp_ack_dup;
+		unsigned int tcp_retransmits;
 		int state;
 		int old_state;
 		int idle_periods;
 
-
+		struct timeval last_packet;
+		unsigned int train;
+		bool bursty;
+		pthread_mutex_t last_lock;
 };
 
 #endif

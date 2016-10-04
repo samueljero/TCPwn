@@ -260,7 +260,7 @@ void TCP::update_conn_times(struct tcphdr *tcph, Message msg, pkt_info pk)
 	if (len > 0) {
 		pthread_mutex_lock(&lock);
 		timeval diff;
-		TimevalSub(&last, &pk.time, &diff);
+		timersub(&last, &pk.time, &diff);
 		if (diff.tv_sec <= 0) {
 			memcpy((char*)&end, (char*) &pk.time, sizeof(timeval));
 		}
@@ -761,29 +761,6 @@ bool TCP::SetPrint(bool on)
 	return true;
 }
 
-void TCP::TimevalSub(timeval* s1, timeval *s2, timeval *res)
-{
-	unsigned long usec;
-	unsigned long sec;
-	unsigned long s2sec;
-	s2sec = s2->tv_sec;
-	if (s1->tv_usec < s2->tv_usec) {
-		s2sec--;
-		s1->tv_usec += 1000000;
-	}
-	usec = s1->tv_usec -s2->tv_usec;
-	sec = s1->tv_sec - s2sec;
-	
-	if (usec >= 1000000) {
-		sec++;
-		usec -= 1000000;
-	}
-	
-	res->tv_sec = sec;
-	res->tv_usec = usec;
-	return;
-}
-
 bool TCP::GetDuration(timeval *tm) 
 {
 	if (tm == NULL) {
@@ -791,7 +768,7 @@ bool TCP::GetDuration(timeval *tm)
 	}
 
 	pthread_mutex_lock(&lock);
-	TimevalSub(&end, &start, tm);
+	timersub(&end, &start, tm);
 	pthread_mutex_unlock(&lock);
 
 	return true;
