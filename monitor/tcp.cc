@@ -11,6 +11,9 @@
 #include <time.h>
 using namespace std;
 
+static const char* const state_strings[] = {"STATE_UNKNOWN", "STATE_INIT", "STATE_SLOW_START", 
+						"STATE_CONG_AVOID", "STATE_FAST_RECOV", "STATE_RTO", "STATE_END"};
+
 
 /* Handle Sequence Wrap */
 /*static int seq_before(uint32_t s1, uint32_t s2)
@@ -88,8 +91,8 @@ void TCP::new_packet(pkt_info pk, Message hdr)
 		}
 	}
 
-	if ((tcp_port1 != ntohs(tcph->th_sport) && tcp_port1 != ntohs(tcph->th_dport)) ||
-	    (tcp_port2 != ntohs(tcph->th_sport) && tcp_port2 != ntohs(tcph->th_dport)) ) {
+	if ((tcp_port1 != ntohs(tcph->th_sport) || tcp_port2 != ntohs(tcph->th_dport)) &&
+	    (tcp_port2 != ntohs(tcph->th_sport) || tcp_port1 != ntohs(tcph->th_dport)) ) {
 		dbgprintf(1, "Skipping packet from other connection... src: %u, dst:%u\n", ntohs(tcph->th_sport), ntohs(tcph->th_dport));
 		goto out;
 	}
@@ -133,7 +136,7 @@ void TCP::updateClassicCongestionControl(pkt_info pk, Message hdr)
 	}
 
 	/* Is data bearing packet */
-	if (tcph->th_off*4 < hdr.len) {
+	if (hdr.len > tcph->th_off*4) {
 		tcp_data_pkts++;
 		//tcp_data_bytes += (hdr.len - tcph->th_off*4);
 	} else {
@@ -148,14 +151,13 @@ void TCP::updateClassicCongestionControl(pkt_info pk, Message hdr)
 
 void TCP::processClassicCongestionControl() 
 {
-	if (state == STATE_INIT && old_state != STATE_INIT) {
-		//print
-		old_state = state;
-		return;		
+	if (state == STATE_INIT) {
+		printState(old_state, state);
+		old_state = state;	
 	}
 
-	if (state == STATE_END && old_state != STATE_END) {
-		//print
+	if (state == STATE_END) {
+		printState(old_state, state);
 		old_state = state;
 		return;
 	}
@@ -163,6 +165,70 @@ void TCP::processClassicCongestionControl()
 	if (tcp_data_pkts == 0 && tcp_ack_pkts == 0) {
 		idle_periods++;
 	}
+
+	if (NAGLE) {
+		if (tcp_ack_pkts > tcp_data_pkts) {
+			old_state = state;
+			state = STATE_FAST_RECOV;
+			printState(old_state, state);
+		} else if (tcp_ack_pkts == 0 && tcp_data_pkts > 0) {
+			old_state = state;
+			state = STATE_RTO;
+			printState(old_state, state);
+		} else if (tcp_ack_pkts > 0.8*tcp_data_pkts) {
+			old_state = state;
+			state = STATE_SLOW_START;
+			printState(old_state, state);
+		} else if (tcp_ack_pkts > 0.3*tcp_data_pkts) {
+			old_state = state;
+			state = STATE_CONG_AVOID;
+			printState(old_state, state);
+		} else {
+			old_state = state;
+			state = STATE_UNKNOWN;
+			printState(old_state, state);
+		}
+	} else {
+		if (tcp_ack_pkts > 2.5*tcp_data_pkts) {
+			old_state = state;
+			state = STATE_FAST_RECOV;
+			printState(old_state, state);
+		} else if (tcp_ack_pkts == 0 && tcp_data_pkts > 0) {
+			old_state = state;
+			state = STATE_RTO;
+			printState(old_state, state);
+		} else if (tcp_ack_pkts > 1.5*tcp_data_pkts) {
+			old_state = state;
+			state = STATE_SLOW_START;
+			printState(old_state, state);
+		} else if (tcp_ack_pkts > 0.5*tcp_data_pkts) {
+			old_state = state;
+			state = STATE_CONG_AVOID;
+			printState(old_state, state);
+		} else {
+			old_state = state;
+			state = STATE_UNKNOWN;
+			printState(old_state, state);
+		}
+	}
+}
+
+void TCP::printState(int oldstate, int state)
+{
+	struct timeval tmnow;
+    struct tm *tm;
+    char buf[30], usec_buf[6];
+
+	if (oldstate == state) {
+		return;
+	}
+
+    gettimeofday(&tmnow, NULL);
+    tm = localtime(&tmnow.tv_sec);
+    strftime(buf,30,"%Y-%m-%d-%H:%M:%S", tm);
+    sprintf(usec_buf,"%06lu",(unsigned long)tmnow.tv_usec);
+
+	dbgprintf(0, "[%s.%s] state = %s", buf,usec_buf, state_strings[state]);
 }
 
 /* Stupid pthreads/C++ glue*/

@@ -18,7 +18,7 @@ all: $(BINARIES)
 clean:
 	rm -f $(BINARIES) *.o *~
         
-monitor: $(MONITOR_HEADERS) $(PROXY_SRC)
+monitor: $(MONITOR_HEADERS) $(MONITOR_SRC)
 	$(CPP) $(CPPFLAGS) $(MONITOR_SRC) -o monitor -lpthread -Wl,-rpath,`pwd` -L`pwd`
 
 sndcmd: $(SNDCMD_SRC)

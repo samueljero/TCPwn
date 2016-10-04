@@ -22,15 +22,6 @@
 #define PROTO_ID_TCP 0
 #define PROTO_ID_MAX 0
 
-#define STATE_INIT 0
-#define STATE_SLOW_START 1
-#define STATE_CONG_AVOID 2
-#define STATE_FAST_RECOV 3
-#define STATE_END 4
-
-#define INTERVAL 10
-
-
 class Tracker{
 	private:
 		Tracker();
