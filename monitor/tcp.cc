@@ -244,23 +244,23 @@ void TCP::processClassicCongestionControl()
 			state = STATE_RTO;
 			printState(old_state, state);
 		} else if (state == STATE_FAST_RECOV && 
-					tcp1_ack_high < tcp1_ack_hold && 
-					tcp2_ack_high < tcp2_ack_hold) {
+					tcp1_ack_high <= tcp1_ack_hold && 
+					tcp2_ack_high <= tcp2_ack_hold) {
 			old_state = state;
 			state = STATE_FAST_RECOV;
 			printState(old_state, state);
 		} else if (tcp_retransmits > 0) {
-			if (old_state != STATE_FAST_RECOV) {
-				tcp1_ack_hold = tcp2_seq_high;
-				tcp2_ack_hold = tcp1_seq_high;
+			if (state != STATE_FAST_RECOV) {
+				tcp1_ack_hold = tcp2_seq_high + 1;
+				tcp2_ack_hold = tcp1_seq_high + 1;
 			}
 			old_state = state;
 			state = STATE_FAST_RECOV;
 			printState(old_state, state);
 		} else if (tcp_data_pkts < 0.8*tcp_ack_pkts && tcp_retransmits > 0) {
-			if (old_state != STATE_FAST_RECOV) {
-				tcp1_ack_hold = tcp1_seq_high;
-				tcp2_ack_hold = tcp2_seq_high;
+			if (state != STATE_FAST_RECOV) {
+				tcp1_ack_hold = tcp2_seq_high + 1;
+				tcp2_ack_hold = tcp1_seq_high + 1;
 			}
 			old_state = state;
 			state = STATE_FAST_RECOV;
@@ -291,22 +291,35 @@ void TCP::processClassicCongestionControl()
 	return;
 }
 
+char* TCP::timestamp(char* buff, int len) {
+	struct timeval tmnow;
+	struct tm *tm;
+	int ret;
+	char usec_buff[10];
+    
+	gettimeofday(&tmnow, NULL);
+    tm = localtime(&tmnow.tv_sec);
+    ret = strftime(buff,len,"%Y-%m-%d-%H:%M:%S", tm);
+	if (ret == 0) {
+		memset(buff, 0, len);
+		return NULL;
+	}
+	len -= ret;
+	strncat(buff,".", len);
+	len--;
+    snprintf(usec_buff,10,"%06lu",(unsigned long)tmnow.tv_usec);
+	strncat(buff, usec_buff, len);
+	return buff;
+}
+
 void TCP::printState(int oldstate, int state)
 {
-	struct timeval tmnow;
-    struct tm *tm;
-    char buf[30], usec_buf[10];
+    char buf[40];
 
 	if (oldstate == state) {
 		return;
 	}
-
-    gettimeofday(&tmnow, NULL);
-    tm = localtime(&tmnow.tv_sec);
-    strftime(buf,30,"%Y-%m-%d-%H:%M:%S", tm);
-    snprintf(usec_buf,10,"%06lu",(unsigned long)tmnow.tv_usec);
-
-	dbgprintf(0, "[%s.%s] state = %s, isec=%lu, iusec=%06lu\n", buf,usec_buf, state_strings[state], holding.tv_sec, holding.tv_usec);
+	dbgprintf(0, "[%s] state = %s, lp=%lu.%06lu\n", timestamp(buf,40), state_strings[state], holding.tv_sec, holding.tv_usec);
 }
 
 /* Stupid pthreads/C++ glue*/

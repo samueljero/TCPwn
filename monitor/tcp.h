@@ -35,7 +35,7 @@ class TCP: public Proto {
 		void updateClassicCongestionControl(Message hdr);
 		void processClassicCongestionControl();
 		void printState(int oldstate, int state);
-
+		 char* timestamp(char* buff, int len);
 		pthread_rwlock_t lock;
 		pthread_t thread;
 		bool running;
