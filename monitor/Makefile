@@ -3,7 +3,7 @@
 ###############################################################################
 CPP=g++
 CC=gcc
-CPPFLAGS=-O2 -Wall -Werror -Wextra -Wpedantic -g
+CPPFLAGS=-O2 -Wall -Werror -Wextra -Wpedantic -lrt -g
 
 BINARIES=monitor sndcmd
 MONITOR_HEADERS=monitor.h control.h csv.h args.h iface.h proto.h tcp.h

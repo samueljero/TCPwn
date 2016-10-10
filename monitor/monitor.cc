@@ -26,12 +26,15 @@ void version();
 void usage();
 void control_loop(int port);
 void cleanupControls();
+static void sig_alrm_handler(int signo);
 
 
 int main(int argc, char** argv)
 {
 	int ctlport = 4444;
 	vector<string> ifaces;
+	sigset_t sigset;
+    struct sigaction sa;
 
 	/*parse commandline options*/
 	if (argc == 1) {
@@ -60,6 +63,15 @@ int main(int argc, char** argv)
 			usage();
 		}
 	}
+
+    /* Ignore SIGALRM */
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGALRM);           
+    sigprocmask(SIG_BLOCK, &sigset, NULL);
+	/* Setup Default handler*/
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = sig_alrm_handler;
+    sigaction(SIGALRM, &sa, NULL);
 
 	/* Initialize Tracker */
 	Tracker::get().start();
@@ -195,4 +207,10 @@ void dbgprintf(int level, const char *fmt, ...)
     	vfprintf(stderr, fmt, args);
     	va_end(args);
     }
+}
+
+/* Dummy signal handler */
+static void sig_alrm_handler(int signo) 
+{
+if (signo == SIGALRM) {}
 }

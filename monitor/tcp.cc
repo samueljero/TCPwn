@@ -34,6 +34,8 @@ static int seq_diff(uint32_t s1, uint32_t s2)
 
 TCP::TCP()
 {
+	struct sigevent se;
+
 	this->thread_running = false;
 	this->thread_cleanup = false;
 	this->running = false;
@@ -52,18 +54,25 @@ TCP::TCP()
 	this->tcp2_ack_low = 0;
 	this->tcp2_ack_high = 0;
 	this->tcp2_port = 0;
-	this->bursty = false;
-	this->train = 0;
 	this->state = STATE_INIT;
 	pthread_rwlock_init(&lock, NULL);
 	gettimeofday(&last_packet, NULL);
-	pthread_mutex_init(&last_lock, NULL);
+	pthread_mutex_init(&time_lock, NULL);
+	memset(&se, 0, sizeof(struct sigevent));
+	se.sigev_notify = SIGEV_SIGNAL;
+	se.sigev_signo = SIGALRM;
+	se.sigev_value.sival_int = 1;
+	timer_create(CLOCK_REALTIME, &se, &pkt_timr);
+	se.sigev_value.sival_int = 2;
+	timer_create(CLOCK_REALTIME, &se, &int_timr);
 }
 
 TCP::~TCP()
 {
 	pthread_rwlock_destroy(&lock);
-	pthread_mutex_destroy(&last_lock);
+	pthread_mutex_destroy(&time_lock);
+	timer_delete(pkt_timr);
+	timer_delete(int_timr);
 }
 
 void TCP::new_packet(pkt_info pk, Message hdr)
@@ -71,6 +80,7 @@ void TCP::new_packet(pkt_info pk, Message hdr)
 	struct tcphdr *tcph;
 	struct timeval tm;
 	struct timeval diff;
+	struct itimerspec tmr_set;
 
 	/* Sanity checks */
 	if (pk.msg.buff == NULL) {
@@ -106,20 +116,19 @@ void TCP::new_packet(pkt_info pk, Message hdr)
 		goto out;
 	}
 
-	if (pthread_mutex_trylock(&last_lock) == 0) {
+	if (pthread_mutex_trylock(&time_lock) == 0) {
 		gettimeofday(&tm, NULL);
 		timersub(&tm,&last_packet,&diff);
-		if (diff.tv_sec == 0 && diff.tv_usec < 3000) {
-			train++;
-		} else {
-			train = 0;
-			bursty = true;
-		}
-		if (train > 1000) {
-			bursty = false;
-		}
+		if (diff.tv_sec > 0 || diff.tv_usec > INT_PKT*MSEC2USEC) {
+			memcpy(&last_idle, &tm, sizeof(struct timeval));
+		} 
 		memcpy(&last_packet, &tm, sizeof(struct timeval));
-		pthread_mutex_unlock(&last_lock);
+		tmr_set.it_value.tv_sec = 0;
+		tmr_set.it_value.tv_nsec = INT_PKT*MSEC2NSEC;
+		tmr_set.it_interval.tv_sec = 0;
+		tmr_set.it_interval.tv_nsec = 0;
+		timer_settime(pkt_timr,0,&tmr_set,NULL);
+		pthread_mutex_unlock(&time_lock);
 	}
 
 	updateClassicCongestionControl(hdr);
@@ -333,40 +342,44 @@ void* TCP::thread_run(void* arg)
 
 void TCP::run()
 {
-	struct timespec sl;
-	struct timespec rem;
 	struct timeval tm;
-	struct timeval diff;
-	int defer = 0;
+	struct timeval diff_pkt;
+	struct timeval diff_idle;
+	sigset_t sigset;
+	int sig;
+    int error;
+
+	/* Allow SIGALRM */
+    sigemptyset(&sigset);
+    sigaddset(&sigset, SIGALRM);
 
 	while (running) {
-		gettimeofday(&tm, NULL);
-		pthread_mutex_lock(&last_lock);
-		timersub(&tm,&last_packet,&diff);
-		pthread_mutex_unlock(&last_lock);
-		memcpy(&holding,&diff,sizeof(struct timeval));
+		error = sigwait(&sigset, &sig);
+        if (error != 0) {
+			dbgprintf(0, "Error: sigwait() failed!\n");
+			break;
+		}
 
-		if (!bursty || diff.tv_sec > 0 || diff.tv_usec > 3000) {
-			defer = 0;
+		gettimeofday(&tm, NULL);
+		pthread_mutex_lock(&time_lock);
+		timersub(&tm,&last_packet,&diff_pkt);
+		timersub(&tm,&last_idle,&diff_idle);
+		pthread_mutex_unlock(&time_lock);
+		memcpy(&holding,&diff_pkt,sizeof(struct timeval));
+
+		if ((diff_idle.tv_sec >= 0 || diff_idle.tv_usec >= 4*INT_TME) ||
+			(diff_pkt.tv_sec >=0 || diff_pkt.tv_usec >= INT_PKT)) {
 			pthread_rwlock_wrlock(&lock);
 			processClassicCongestionControl();
 			pthread_rwlock_unlock(&lock);
-		} else {
-			defer++;
-		}
-
-		/* Sleep for interval */
-		sl.tv_sec = 0;
-		sl.tv_nsec = INTERVAL*1000000;
-		while (nanosleep(&sl, &rem) < 0) {
-			sl.tv_sec = rem.tv_sec;
-			sl.tv_nsec = rem.tv_nsec;
 		}
 	}
 }
 
 bool TCP::start()
 {
+	struct itimerspec tmr_set;
+
 	running = true;
 	if (pthread_create(&thread, NULL, thread_run, this) < 0) {
 		dbgprintf(0, "Error: Failed to start tracker thread!: %s\n", strerror(errno));
@@ -375,13 +388,30 @@ bool TCP::start()
 	}
 	thread_running = true;
 	thread_cleanup = true;
+
+	pthread_mutex_lock(&time_lock);
+	tmr_set.it_value.tv_sec = 0;
+	tmr_set.it_value.tv_nsec = INT_TME*MSEC2NSEC;
+	tmr_set.it_interval.tv_sec = 0;
+	tmr_set.it_interval.tv_nsec = INT_TME*MSEC2NSEC;
+	timer_settime(int_timr,0,&tmr_set,NULL);
+	pthread_mutex_unlock(&time_lock);
 	return true;
 }
 
 bool TCP::stop()
 {
+	struct itimerspec tmr_set;
+
 	if (running) {
 		running = false;
+		pthread_mutex_lock(&time_lock);
+		tmr_set.it_value.tv_sec = 0;
+		tmr_set.it_value.tv_nsec = INT_PKT*MSEC2NSEC;
+		tmr_set.it_interval.tv_sec = 0;
+		tmr_set.it_interval.tv_nsec = 0;
+		timer_settime(int_timr,0,&tmr_set,NULL);
+		pthread_mutex_unlock(&time_lock);
 	}
 
 	if (thread_cleanup) {

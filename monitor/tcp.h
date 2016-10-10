@@ -7,6 +7,7 @@
 #include "proto.h"
 #include <netinet/tcp.h>
 
+
 #define STATE_UNKNOWN 0
 #define STATE_INIT 1
 #define STATE_SLOW_START 2
@@ -15,9 +16,10 @@
 #define STATE_RTO 5
 #define STATE_END 6
 
-#define INTERVAL 10
-
-#define DELAYED_ACK true
+#define INT_TME 10
+#define INT_PKT 5
+#define MSEC2USEC 1000
+#define MSEC2NSEC 1000000
 
 class TCP: public Proto {
 	public:
@@ -35,7 +37,8 @@ class TCP: public Proto {
 		void updateClassicCongestionControl(Message hdr);
 		void processClassicCongestionControl();
 		void printState(int oldstate, int state);
-		 char* timestamp(char* buff, int len);
+		char* timestamp(char* buff, int len);
+
 		pthread_rwlock_t lock;
 		pthread_t thread;
 		bool running;
@@ -66,9 +69,10 @@ class TCP: public Proto {
 		int idle_periods;
 
 		struct timeval last_packet;
-		unsigned int train;
-		bool bursty;
-		pthread_mutex_t last_lock;
+		struct timeval last_idle;
+		pthread_mutex_t time_lock;
+		timer_t pkt_timr;
+		timer_t int_timr;
 };
 
 #endif
