@@ -1,15 +1,13 @@
 /******************************************************************************
 * Author: Samuel Jero <sjero@purdue.edu> and Xiangyu Bu <xb@purdue.edu>
-*
-* Rule Format:
-* src_ip,dst_ip,proto
+* Congestion Control Sender Monitor: Tracker Module
 ******************************************************************************/
 #include "tracker.h"
 #include "iface.h"
-#include "csv.h"
-#include "args.h"
 #include "proto.h"
+#include "algorithm.h"
 #include "tcp.h"
+#include "classic.h"
 #include <stdarg.h>
 #include <time.h>
 #include <sys/time.h>
@@ -25,28 +23,24 @@
 #include <climits>
 using namespace std;
 
-#define ATTACKER_ROW_NUM_FIELDS		7
-#define ATTACKER_ARGS_DELIM		'&'
-
 #define PROTO_ALIAS_TCP			"TCP"
-
-#define IP_WILDCARD 0
-
-#define TIME_ERROR ULONG_MAX
-
-#define PKT_TYPES_STR_LEN		5000
+#define ALG_ALIAS_CLASSIC		"classic"
 
 Tracker::Tracker()
 {
+	alg_id = ALG_ID_CLASSIC;
+	proto_id = PROTO_ID_TCP;
 	proto = NULL;
-	pthread_rwlock_init(&lock, NULL);
+	alg = NULL;
+	sock = -1;
+	pthread_mutex_init(&lock, NULL);
 }
 Tracker::~Tracker()
 {
 	if (proto != NULL) {
 		stop();
 	}
-	pthread_rwlock_destroy(&lock);
+	pthread_mutex_destroy(&lock);
 }
 
 Tracker& Tracker::get()
@@ -55,103 +49,31 @@ Tracker& Tracker::get()
 	return me;
 }
 
-bool Tracker::addCommand(Message m, Message *resp)
+bool Tracker::setAlgorithmAndProtocol(char *alg, char* proto)
 {
-	bool ret = true;
-	size_t num_fields;
-	int action_type;
-	int proto;
-	unsigned long start;
-	unsigned long stop;
-	uint32_t ip_src;
-	uint32_t ip_dst;
-	char **fields;
-	arg_node_t *args;
+	int proto_id;
+	int alg_id;
 
-	dbgprintf(2, "Received CMD: %s\n", m.buff);
-
-	/* Parse CSV */
-	fields = csv_parse(m.buff, m.len, &num_fields);
-
-	if (num_fields != ATTACKER_ROW_NUM_FIELDS) {
-		dbgprintf(0,"Adding Command: csv field count mismatch (%lu / %d).\n", num_fields, ATTACKER_ROW_NUM_FIELDS);
-		ret = false;
-		goto out;
+	proto_id = normalize_proto(proto);
+	if (proto_id == PROTO_ID_ERR) {
+		return false;
 	}
 
-	ip_src = normalize_addr(fields[0]);
-	ip_dst = normalize_addr(fields[1]);
-
-	if ((proto = normalize_proto(fields[2])) == PROTO_ID_ERR) {
-		dbgprintf(0,"Adding Command: unsupported protocol \"%s\".\n", fields[3]);
-		ret = false;
-		goto out;
+	alg_id = normalize_algorithm(alg);
+	if (alg_id == ALG_ID_ERR) {
+		return false;
 	}
 
-	if ((start = normalize_time(fields[3])) == TIME_ERROR) {
-		dbgprintf(0,"Adding Command: invalid start time \"%s\".\n", fields[4]);
-		ret = false;
-		goto out;
-	}
-
-	if ((stop = normalize_time(fields[4])) == TIME_ERROR) {
-		dbgprintf(0,"Adding Command: invalid end time \"%s\".\n", fields[4]);
-		ret = false;
-		goto out;
-	}
-	if ( stop != 0 && stop < start) {
-		dbgprintf(0,"Adding Command: end time before start time.\n");
-		ret = false;
-		goto out;
-	}
-
-	if ((action_type = normalize_action_type(fields[5])) == ACTION_ID_ERR) {
-		dbgprintf(0,"Adding Command: unsupported malicious action \"%s\".\n", fields[5]);
-		ret = false;
-		goto out;
-	}
-	if (ip_src == IP_WILDCARD || ip_dst == IP_WILDCARD) {
-		dbgprintf(0,"Adding Command: bad addresses \"%s\", \"%s\"\n", fields[0],fields[1]);
-		ret = false;
-		goto out;
-	}
-
-	args = args_parse(fields[6],ATTACKER_ARGS_DELIM);
-	if (!args) {
-		dbgprintf(0,"Adding Command: failed to parse arguments \"%s\"\n", fields[6]);
-		ret = false;
-		goto out;
-	}
-
-	pthread_rwlock_wrlock(&lock);
-
-	/* Process this action for this connection */
-	if (ret) {
-		dbgprintf(1, "New Rule Installed: %u -> %u (%i), %lu -> %lu, %i\n", ip_src, ip_dst, proto, start, stop, action_type);
-	}
-
-	if (resp) {
-		resp = NULL;
-	}
-
-	/*release lock*/
-	pthread_rwlock_unlock(&lock);
-	args_free(args);
-out:
-	csv_free(fields);
-	return ret;
+	return true;
 }
 
-int Tracker::normalize_action_type(char *s)
-{
-	int ret;
-	if (is_int(s)) {
-		ret = atoi(s);
-		if (ret < ACTION_ID_MIN || ret > ACTION_ID_MAX) return ACTION_ID_ERR;
-		return ret;
+int Tracker::is_int(char *v) {
+	if (*v == '\0') return 0;
+	while (*v != '\0') {
+		if (*v < '0' || *v > '9') return 0;
+		++v;
 	}
-	return ACTION_ID_ERR;
-	return 0;
+	return 1;
 }
 
 int Tracker::normalize_proto(char *s)
@@ -167,76 +89,22 @@ int Tracker::normalize_proto(char *s)
 	return PROTO_ID_ERR;
 }
 
-uint32_t Tracker::normalize_addr(char *s)
+int Tracker::normalize_algorithm(char *s)
 {
-	struct addrinfo hints;
-	struct addrinfo *results, *p;
-	struct sockaddr_in *v4;
-	uint32_t res;
-
-	if (s[0] == '*') {
-		return IP_WILDCARD;
+	int ret;
+	if (is_int(s)) {
+		ret = atoi(s);
+		if (ret < ALG_ID_MIN || ret > ALG_ID_MAX) return ALG_ID_ERR;
+		return ret;
 	}
 
-	/* Lookup IP/Hostname */
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_INET;
-	if (getaddrinfo(s, NULL, &hints, &results) < 0) {
-		return IP_WILDCARD;
-	}
-
-	for (p = results; p!=NULL; p = p->ai_next) {
-		v4 = (struct sockaddr_in*)p->ai_addr;
-		res = v4->sin_addr.s_addr;
-		return res;
-	}
-
-	return IP_WILDCARD;
-}
-
-bool Tracker::normalize_mac(char* str, char* raw)
-{
-	char *ptr = str;
-	char *end = str;
-	int tmp;
-	int byte = 0;
-
-	while (*end != 0 && byte < 6) {
-		tmp = strtol(ptr,&end,16);
-		if (*end != ':' && *end != 0) {
-			return false;
-		}
-
-		raw[byte] = tmp;
-		byte++;
-		ptr = end + 1;
-	}
-
-	if (byte != 6) {
-		return false;
-	}
-
-	return true;
-}
-
-unsigned long Tracker::normalize_time(char *s)
-{
-	unsigned long t;
-	char *end;
-
-	t = strtoul(s,&end,0);
-	if (end == s) {
-		return TIME_ERROR;
-	}
-
-	return t;
+	if (!strcmp(ALG_ALIAS_CLASSIC,s)) return ALG_ID_CLASSIC;
+	return ALG_ID_ERR;
 }
 
 pkt_info Tracker::track(pkt_info pk)
 {
 	Message m;
-
-	pthread_rwlock_rdlock(&lock);
 
 	if (monitor_debug > 2) {
 		print(pk);
@@ -244,8 +112,6 @@ pkt_info Tracker::track(pkt_info pk)
 
 	m = pk.msg;
 	parseEthernet(pk, m);
-
-	pthread_rwlock_unlock(&lock);
 	return pk;
 }
 
@@ -308,8 +174,8 @@ void Tracker::parseIPv4(pkt_info pk, Message cur)
 
 	switch(ip->protocol) {
 		case 6: //TCP
-			if (proto && proto->hasIPProto(6)) {
-				proto->new_packet(pk,m);
+			if (alg && proto && proto->hasIPProto(6)) {
+				alg->new_packet(pk,m);
 			}
 			break;
 		default:
@@ -327,16 +193,144 @@ void Tracker::print(pkt_info pk)
 bool Tracker::start()
 {
 	if (!proto) {
-		proto = new TCP();
-		proto->start();
+		switch (proto_id) {
+			case PROTO_ID_TCP:
+				proto = new TCP();
+				break;
+			default:
+				proto = NULL;
+		}
+		
+	}
+	if (!alg) {
+		switch(alg_id) {
+			case ALG_ID_CLASSIC:
+				alg = new Classic(proto);
+				alg->start();
+				break;
+			default:
+				alg = NULL;
+		}
+
 	}
 	return true;
 }
 
 bool Tracker::stop()
 {
-	if (proto) {
-		proto->stop();
+	if (alg) {
+		alg->stop();
 	}
+	delete alg;
+	alg = NULL;
+	delete proto;
+	proto = NULL;
+	closeOutputSocket();
+	return true;
+}
+
+bool Tracker::openOutputSocket(struct sockaddr_in &addr)
+{
+	closeOutputSocket();
+
+	pthread_mutex_lock(&lock);
+	memcpy(&output_addr, &addr, sizeof(struct sockaddr_in));
+
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0) {
+		dbgprintf(0, "Connection Failed: Could not create sock: %s\n", strerror(errno));
+		sock = -1;
+	}
+
+	if (sock > 0 && connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+		dbgprintf(0, "Connection Failed: %s\n", strerror(errno));
+		close(sock);
+		sock = -1;
+	}
+	pthread_mutex_unlock(&lock);
+	return sock > 0;
+}
+
+bool Tracker::closeOutputSocket()
+{
+	if (sock != -1) {
+		pthread_mutex_lock(&lock);
+		close(sock);
+		sock = -1;
+		pthread_mutex_unlock(&lock);
+	}
+	return true;
+}
+
+void Tracker::sendState(const char *state, const char* ip1, const char* ip2, const char* p)
+{
+	char buff[100];
+	Message m;
+
+	if (sock < 0) {
+		return;
+	}
+
+	pthread_mutex_lock(&lock);
+	readAndThrowAway();
+
+	
+
+	m.buff = buff;
+	m.alloc = 100;
+	m.len = 0;
+	m.len = snprintf(m.buff,m.alloc,"%s,%s,%s,0,0,STATE,state=%s\n", ip1, ip2, p, state);
+	if (m.len < 0 || m.len >= m.alloc) {
+		return;
+	}
+	sendMsg(m);
+	pthread_mutex_unlock(&lock);
+}
+
+void Tracker::readAndThrowAway()
+{
+	char buff[32];
+	int len;
+
+	while ((len = recv(sock,buff,32,MSG_DONTWAIT)) >= 0) {
+		//throwaway
+	}
+
+	return;
+}
+
+bool Tracker::sendMsg(Message m)
+{
+	char *buff;
+	int len;
+	uint16_t len16;
+	int ret;
+
+	if (sock <= 0) {
+		return false;
+	}
+
+	if (m.len > 65533) {
+		return false;
+	}
+
+	buff = (char*)malloc(m.len + 2);
+	if (!buff) {
+		dbgprintf(0, "Error: Cannot allocate Memory!\n");
+		return false;
+	}
+
+	len = m.len + 2;
+	len16 = htons(len);
+	memcpy(&buff[0], (char*)&len16, 2);
+	memcpy(&buff[2], m.buff, m.len);
+	ret = send(sock,buff,len,0);
+	if (ret < 0) {
+		dbgprintf(0, "Error: send() failed: %s\n", strerror(errno));
+		free(buff);
+		return false;
+	}
+
+	free(buff);
 	return true;
 }

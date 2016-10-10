@@ -1,5 +1,6 @@
 /******************************************************************************
  * Author: Samuel Jero <sjero@purdue.edu>
+* Congestion Control Sender Monitor: TCP specific header
 ******************************************************************************/
 #ifndef _TCP_H
 #define _TCP_H
@@ -7,44 +8,40 @@
 #include "proto.h"
 #include <netinet/tcp.h>
 
-
-#define STATE_UNKNOWN 0
-#define STATE_INIT 1
-#define STATE_SLOW_START 2
-#define STATE_CONG_AVOID 3
-#define STATE_FAST_RECOV 4
-#define STATE_RTO 5
-#define STATE_END 6
-
-#define INT_TME 10
-#define INT_PKT 5
-#define MSEC2USEC 1000
-#define MSEC2NSEC 1000000
+#define TCP_STATE_UNKNOWN 0
+#define TCP_STATE_START 1
+#define TCP_STATE_MID 2
+#define TCP_STATE_END 3
 
 class TCP: public Proto {
 	public:
 		TCP();
 		~TCP();
-		virtual void new_packet(pkt_info pk, Message hdr);
-		virtual bool start();
-		virtual bool stop();
-		virtual bool isRunning() {return running || thread_running;}
+		virtual bool new_packet(pkt_info pk, Message hdr);
 		virtual bool hasIPProto(int num) {return num == 6;}
+		virtual const char* name() {return "TCP";}
+		virtual void lockCtrs() {pthread_rwlock_wrlock(&lock);}
+		virtual void unlockCtrs() {pthread_rwlock_unlock(&lock);}
+		virtual unsigned long DataPkts() {return tcp_data_pkts;}
+		virtual unsigned long AckPkts() {return tcp_ack_pkts;}
+		virtual unsigned long DataBytes() {return tcp_data_bytes;}
+		virtual unsigned long AckBytes() {return tcp_ack_bytes;}
+		virtual unsigned long Retransmissions() {return tcp_retransmits;}
+		virtual void setAckHolds();
+		virtual bool areAckHoldsPassed();
+		virtual bool isStart() {return state == TCP_STATE_START;}
+		virtual bool isEnd() {return state == TCP_STATE_END;}
+		virtual bool isUnknown() {return state == TCP_STATE_UNKNOWN;}
+		virtual void resetCtrs();
+		virtual const char* getIP1() {return ip1str;}
+		virtual const char* getIP2() {return ip2str;}
+
 
 	private:
-		static void* thread_run(void* arg);
-		void run();
-		void updateClassicCongestionControl(Message hdr);
-		void processClassicCongestionControl();
-		void printState(int oldstate, int state);
-		char* timestamp(char* buff, int len);
-		void triggerTimerNow();
+		void updateTCPVars(Message hdr);
+		void resolveIP2str(uint32_t ip, char* str, int len);
 
 		pthread_rwlock_t lock;
-		pthread_t thread;
-		bool running;
-		bool thread_running;
-		bool thread_cleanup;
 
 		unsigned int tcp1_port;
 		unsigned int tcp1_seq_low;
@@ -68,14 +65,10 @@ class TCP: public Proto {
 		int state;
 		int old_state;
 		int idle_periods;
-
-		bool urgent_event;
-		double prior_ratio;
-		struct timeval last_packet;
-		struct timeval last_idle;
-		pthread_mutex_t time_lock;
-		timer_t pkt_timr;
-		timer_t int_timr;
+		uint32_t ip1;
+		uint32_t ip2;
+		char ip1str[INET_ADDRSTRLEN];
+		char ip2str[INET_ADDRSTRLEN];
 };
 
 #endif

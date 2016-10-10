@@ -7,7 +7,6 @@
 #include <string>
 #include <stdarg.h>
 #include "monitor.h"
-#include "control.h"
 #include "iface.h"
 #include "tracker.h"
 using namespace std;
@@ -18,14 +17,12 @@ using namespace std;
 
 int monitor_debug = 1;
 
-list<Control*> controls;
 Iface* iface1;
 Iface* iface2;
 
 void version();
 void usage();
 void control_loop(int port);
-void cleanupControls();
 static void sig_alrm_handler(int signo);
 
 
@@ -33,8 +30,10 @@ int main(int argc, char** argv)
 {
 	int ctlport = 4444;
 	vector<string> ifaces;
+	struct sockaddr_in outputaddr;
 	sigset_t sigset;
     struct sigaction sa;
+	memset(&outputaddr, 0, sizeof(struct sockaddr_in));
 
 	/*parse commandline options*/
 	if (argc == 1) {
@@ -56,7 +55,40 @@ int main(int argc, char** argv)
 				dbgprintf(0, "Error parsing control port: %s\n", argv[i]);
 				usage();
 			}
-		} else if (argv[i][0] == '-' && argv[i][1] == 'i'){ /*-c*/
+		} else if (strcmp(argv[i], "-o") == 0) { /*-o*/
+			i++;
+			/* Parse Line */
+			int port = 0;
+			char *ip = NULL;
+			sscanf(argv[i], "%m[^:]:%i",&ip, &port);
+			if (!port || !ip){
+				dbgprintf(0,"Error parsing output connection description: %s\n", argv[i]);
+				usage();
+			}
+
+			/* Parse IP */
+			struct addrinfo hints;
+			struct addrinfo *results, *p;
+			int found;
+			int ret;
+			memset(&hints, 0, sizeof(struct addrinfo));
+			hints.ai_family = AF_INET;
+			if ((ret = getaddrinfo(ip, NULL, &hints, &results)) < 0) {
+				dbgprintf(0, "Error parsing output connection description: %s\n", gai_strerror(ret));
+				usage();
+			}
+			found = 0;
+			for (p = results; p!=NULL; p = p->ai_next) {
+				memcpy(&outputaddr, p->ai_addr, sizeof(struct sockaddr_in));
+				found = 1;
+				break;
+			}
+			if (found == 0) {
+				dbgprintf(0, "Error parsing output connection  description: No IP addresses found\n");
+				usage();
+			}
+			outputaddr.sin_port = htons(port);
+		} else if (strcmp(argv[i], "-i") == 0) { /*-i*/
 			i++;
 			ifaces.push_back(string(&argv[i][0]));
 		}else{
@@ -75,6 +107,7 @@ int main(int argc, char** argv)
 
 	/* Initialize Tracker */
 	Tracker::get().start();
+	Tracker::get().openOutputSocket(outputaddr);
 
 	/* Setup Ifaces */
 	if (ifaces.size() != 2) {
@@ -121,7 +154,6 @@ void control_loop(int port)
 	struct sockaddr_in sin;
 	int sock;
 	int new_sock;
-	Control *ctl;
 
 	/* Setup Socket */
 	sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -158,23 +190,7 @@ void control_loop(int port)
 		}
 
 		dbgprintf(3, "New Control Connection\n");
-		
-		ctl = new Control(new_sock);
-		ctl->start();
-		controls.push_front(ctl);
-
-		cleanupControls();
-	}
-}
-
-void cleanupControls()
-{
-	for (list<Control*>::iterator it = controls.begin(); it != controls.end(); it++) {
-		if( !(*it)->isRunning()) {
-			delete *it;
-			controls.erase(it);
-			it = controls.begin();
-		}
+		close(new_sock);
 	}
 }
 
@@ -191,9 +207,12 @@ void version()
 /*Usage information for program*/
 void usage()
 {
-	dbgprintf(0,"Usage: monitor [-v] [-V] [-h] [-i interface] [-p control_port]\n");
+	dbgprintf(0,"Usage: monitor [-v] [-V] [-h][-i interface] [-p control_port][-o host:port]\n");
 	dbgprintf(0, "          -v   verbose. May be repeated for additional verbosity.\n");
 	dbgprintf(0, "          -V   Version information\n");
+	dbgprintf(0, "          -i   Interface to listen and bridge on. Must specify exactly two -i options\n");
+	dbgprintf(0, "          -p   TCP port to listen on to indicate that monitor is operational\n");
+	dbgprintf(0, "          -o   Option a TCP connection to this location and output sender's current state during connection\n");
 	dbgprintf(0, "          -h   Help\n");
 	exit(0);
 }

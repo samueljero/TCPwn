@@ -5,22 +5,23 @@
 #ifndef _TRACKER_H
 #define _TRACKER_H
 #include "monitor.h"
-#include "args.h"
 #include "proto.h"
+#include "algorithm.h"
 #include <map>
 #include <list>
 #include <vector>
 #include <string>
 #include <sys/time.h>
 
-#define ACTION_ID_ERR (-1)
-#define ACTION_ID_MIN (-1)
-#define ACTION_ID_MAX (-1)
-
 #define PROTO_ID_ERR (-1)
 #define PROTO_ID_MIN 0
 #define PROTO_ID_TCP 0
 #define PROTO_ID_MAX 0
+
+#define ALG_ID_ERR (-1)
+#define ALG_ID_MIN 0
+#define ALG_ID_CLASSIC 0
+#define ALG_ID_MAX 0
 
 class Tracker{
 	private:
@@ -29,24 +30,32 @@ class Tracker{
 	public:
 		~Tracker();
 		static Tracker& get();
-		bool addCommand(Message m, Message *resp);
 		pkt_info track(pkt_info pk);
-		uint32_t normalize_addr(char* s);
-		bool normalize_mac(char* str, char* raw);
 		bool start();
 		bool stop();
-		bool isRunning() {return proto && proto->isRunning();}
+		bool isRunning() {return alg && alg->isRunning();}
+		bool openOutputSocket(struct sockaddr_in &addr);
+		bool closeOutputSocket();
+		bool setAlgorithmAndProtocol(char *alg, char* proto);
+		void sendState(const char *state, const char* ip1, const char* ip2, const char* p);
 
 	private:
 		void parseEthernet(pkt_info pk, Message cur);
 		void parseIPv4(pkt_info pk, Message cur);
-		int normalize_action_type(char *s);
 		int normalize_proto(char *s);
-		unsigned long normalize_time(char *s);
+		int normalize_algorithm(char *s);
+		int is_int(char *v);
 		void print(pkt_info pk);
+		bool sendMsg(Message m);
+		void readAndThrowAway();
 
 		Proto* proto;
-		pthread_rwlock_t lock;
+		Algorithm* alg;
+		int alg_id;
+		int proto_id;
+		pthread_mutex_t lock;
+		struct sockaddr_in output_addr;
+		int sock;
 };
 
 
