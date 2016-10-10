@@ -21,7 +21,7 @@ class Proto {
 		virtual unsigned long AckBytes() = 0;
 		virtual unsigned long Retransmissions() = 0;
 		virtual void setAckHolds() = 0;
-		virtual bool areAckHoldsPassed() = 0;
+		virtual bool AckHoldsNotPassed() = 0;
 		virtual bool isStart() = 0;
 		virtual bool isEnd() = 0;
 		virtual bool isUnknown() = 0;

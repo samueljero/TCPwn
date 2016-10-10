@@ -107,7 +107,9 @@ int main(int argc, char** argv)
 
 	/* Initialize Tracker */
 	Tracker::get().start();
-	Tracker::get().openOutputSocket(outputaddr);
+	if (outputaddr.sin_port > 0) {
+		Tracker::get().openOutputSocket(outputaddr);
+	}
 
 	/* Setup Ifaces */
 	if (ifaces.size() != 2) {

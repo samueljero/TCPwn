@@ -28,7 +28,7 @@ class TCP: public Proto {
 		virtual unsigned long AckBytes() {return tcp_ack_bytes;}
 		virtual unsigned long Retransmissions() {return tcp_retransmits;}
 		virtual void setAckHolds();
-		virtual bool areAckHoldsPassed();
+		virtual bool AckHoldsNotPassed();
 		virtual bool isStart() {return state == TCP_STATE_START;}
 		virtual bool isEnd() {return state == TCP_STATE_END;}
 		virtual bool isUnknown() {return state == TCP_STATE_UNKNOWN;}

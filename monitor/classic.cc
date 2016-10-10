@@ -24,6 +24,7 @@ Classic::Classic(Proto *p)
 	this->thread_cleanup = false;
 	this->running = false;
 	this->state = STATE_INIT;
+	this->old_state = STATE_UNKNOWN;
 	this->urgent_event = false;
 	this->prior_ratio = 0;
 	gettimeofday(&last_packet, NULL);
@@ -107,12 +108,14 @@ void Classic::processClassicCongestionControl()
 	}
 
 	if (p->isStart()) {
+		old_state = state;
 		state = STATE_INIT;
 		printState(old_state, state);
 		old_state = state;
 	}
 
 	if (p->isEnd()) {
+		old_state = state;
 		state = STATE_END;
 		printState(old_state, state);
 		old_state = state;
@@ -137,7 +140,7 @@ void Classic::processClassicCongestionControl()
 		old_state = state;
 		state = STATE_RTO;
 		printState(old_state, state);
-	} else if (state == STATE_FAST_RECOV && !p->areAckHoldsPassed()) {
+	} else if (state == STATE_FAST_RECOV && p->AckHoldsNotPassed()) {
 		old_state = state;
 		state = STATE_FAST_RECOV;
 		printState(old_state, state);
@@ -196,15 +199,14 @@ char* Classic::timestamp(char* buff, int len) {
 
 void Classic::printState(int oldstate, int state)
 {
-    char buf[40];
-
+   	char buf[40];
 	if (oldstate == state) {
 		return;
 	}
 
 	Tracker::get().sendState(state_strings[state], p->getIP1(), p->getIP2(), p->name());
 	dbgprintf(1, "[%s] state = %s, lp=%lu.%06lu, il=%lu.%06lu\n", timestamp(buf,40), state_strings[state], holding1.tv_sec, holding1.tv_usec, holding2.tv_sec, holding2.tv_usec);
-}
+	}
 
 /* Stupid pthreads/C++ glue*/
 void* Classic::thread_run(void* arg)

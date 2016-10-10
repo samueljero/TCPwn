@@ -126,6 +126,7 @@ void TCP::updateTCPVars(Message hdr)
 	if (!(tcph->th_flags & TH_ACK)) {
 		return;
 	}
+	state = TCP_STATE_MID;
 
 	/* Is data bearing packet */
 	if (hdr.len > tcph->th_off*4) {
@@ -198,7 +199,7 @@ void TCP::setAckHolds()
 	tcp2_ack_hold = tcp1_seq_high + 1;
 }
 
-bool TCP::areAckHoldsPassed()
+bool TCP::AckHoldsNotPassed()
 {
 	return tcp1_ack_high <= tcp1_ack_hold && tcp2_ack_high <= tcp2_ack_hold;
 }
