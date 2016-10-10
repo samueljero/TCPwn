@@ -38,6 +38,7 @@ class TCP: public Proto {
 		void processClassicCongestionControl();
 		void printState(int oldstate, int state);
 		char* timestamp(char* buff, int len);
+		void triggerTimerNow();
 
 		pthread_rwlock_t lock;
 		pthread_t thread;
@@ -68,6 +69,8 @@ class TCP: public Proto {
 		int old_state;
 		int idle_periods;
 
+		bool urgent_event;
+		double prior_ratio;
 		struct timeval last_packet;
 		struct timeval last_idle;
 		pthread_mutex_t time_lock;

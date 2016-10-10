@@ -14,7 +14,8 @@ using namespace std;
 static const char* const state_strings[] = {"STATE_UNKNOWN", "STATE_INIT", "STATE_SLOW_START", 
 						"STATE_CONG_AVOID", "STATE_FAST_RECOV", "STATE_RTO", "STATE_END"};
 
-struct timeval holding;
+struct timeval holding1;
+struct timeval holding2;
 
 /* Handle Sequence Wrap */
 static int seq_before(uint32_t s1, uint32_t s2)
@@ -55,6 +56,8 @@ TCP::TCP()
 	this->tcp2_ack_high = 0;
 	this->tcp2_port = 0;
 	this->state = STATE_INIT;
+	this->urgent_event = false;
+	this->prior_ratio = 0;
 	pthread_rwlock_init(&lock, NULL);
 	gettimeofday(&last_packet, NULL);
 	pthread_mutex_init(&time_lock, NULL);
@@ -138,6 +141,20 @@ out:
 	return;
 }
 
+void TCP::triggerTimerNow()
+{
+	struct itimerspec tmr_set;
+
+	pthread_mutex_lock(&time_lock);
+	urgent_event = true;
+	tmr_set.it_value.tv_sec = 0;
+	tmr_set.it_value.tv_nsec = 1;
+	tmr_set.it_interval.tv_sec = 0;
+	tmr_set.it_interval.tv_nsec = 0;
+	timer_settime(pkt_timr,0,&tmr_set,NULL);
+	pthread_mutex_unlock(&time_lock);
+}
+
 void TCP::updateClassicCongestionControl(Message hdr)
 {
 	struct tcphdr *tcph;
@@ -154,6 +171,7 @@ void TCP::updateClassicCongestionControl(Message hdr)
 	/* Set State INIT on SYN */
 	if (tcph->th_flags & TH_SYN) {
 		state = STATE_INIT;
+		triggerTimerNow();
 		return;
 	}
 
@@ -161,6 +179,7 @@ void TCP::updateClassicCongestionControl(Message hdr)
 	if ((tcph->th_flags & TH_FIN) ||
 	    (tcph->th_flags & TH_RST)) {
 		state = STATE_END;
+		triggerTimerNow();
 		return;
 	}
 
@@ -197,6 +216,7 @@ void TCP::updateClassicCongestionControl(Message hdr)
 			}
 
 			if (SEQ_BEFORE(ntohl(tcph->th_seq), (uint32_t)tcp1_seq_high)) {
+				triggerTimerNow();
 				tcp_retransmits++;
 			}
 	} else {
@@ -219,6 +239,7 @@ void TCP::updateClassicCongestionControl(Message hdr)
 			}
 
 			if (SEQ_BEFORE(ntohl(tcph->th_seq), (uint32_t)tcp2_seq_high)) {
+				triggerTimerNow();
 				tcp_retransmits++;
 			}
 	}
@@ -227,6 +248,8 @@ void TCP::updateClassicCongestionControl(Message hdr)
 
 void TCP::processClassicCongestionControl() 
 {
+	double cur = 0;
+
 	/* Don't do anything before connection is established */
 	if (tcp1_port == 0 || tcp2_port == 0) {
 		return;
@@ -248,48 +271,53 @@ void TCP::processClassicCongestionControl()
 		return;
 	}
 
-		if (tcp_ack_pkts == 0 && tcp_data_pkts > 0 && tcp_data_pkts < 10 && idle_periods > 3) {
-			old_state = state;
-			state = STATE_RTO;
-			printState(old_state, state);
-		} else if (state == STATE_FAST_RECOV && 
-					tcp1_ack_high <= tcp1_ack_hold && 
-					tcp2_ack_high <= tcp2_ack_hold) {
-			old_state = state;
-			state = STATE_FAST_RECOV;
-			printState(old_state, state);
-		} else if (tcp_retransmits > 0) {
-			if (state != STATE_FAST_RECOV) {
-				tcp1_ack_hold = tcp2_seq_high + 1;
-				tcp2_ack_hold = tcp1_seq_high + 1;
-			}
-			old_state = state;
-			state = STATE_FAST_RECOV;
-			printState(old_state, state);
-		} else if (tcp_data_pkts < 0.8*tcp_ack_pkts && tcp_retransmits > 0) {
-			if (state != STATE_FAST_RECOV) {
-				tcp1_ack_hold = tcp2_seq_high + 1;
-				tcp2_ack_hold = tcp1_seq_high + 1;
-			}
-			old_state = state;
-			state = STATE_FAST_RECOV;
-			printState(old_state, state);
-		} else if (tcp_data_bytes > 1.8*tcp_ack_bytes) {
-			old_state = state;
-			state = STATE_SLOW_START;
-			printState(old_state, state);
-		} else if (tcp_data_bytes > 0.8*tcp_ack_bytes) {
-			old_state = state;
-			state = STATE_CONG_AVOID;
-			printState(old_state, state);
-		} else if (tcp_ack_bytes > tcp_data_bytes) {
-			return;
-		} else if (state != STATE_INIT || tcp_data_bytes != 0){
-			old_state = state;
-			state = STATE_UNKNOWN;
-			printState(old_state, state);
-			dbgprintf(0, "ACK: %u, Data: %u\n", tcp_ack_bytes, tcp_data_bytes);
+	/* Compute ack/data ratios */
+	if (tcp_ack_bytes > 0) {
+		cur = tcp_data_bytes / (tcp_ack_bytes*1.0);
+	}
+	if (prior_ratio == 0) {
+		prior_ratio = cur;
+	}
+
+	/* Determine state */
+	if (tcp_ack_pkts == 0 && tcp_data_pkts > 0 && tcp_data_pkts < 10 && idle_periods > 3) {
+		old_state = state;
+		state = STATE_RTO;
+		printState(old_state, state);
+	} else if (state == STATE_FAST_RECOV && 
+				tcp1_ack_high <= tcp1_ack_hold && 
+				tcp2_ack_high <= tcp2_ack_hold) {
+		old_state = state;
+		state = STATE_FAST_RECOV;
+		printState(old_state, state);
+	//} else if (cur < 0.8 && tcp_retransmits > 0) {
+	} else if (tcp_retransmits > 0) {
+		if (state != STATE_FAST_RECOV) {
+			tcp1_ack_hold = tcp2_seq_high + 1;
+			tcp2_ack_hold = tcp1_seq_high + 1;
 		}
+		old_state = state;
+		state = STATE_FAST_RECOV;
+		printState(old_state, state);
+	//} else if (tcp_data_bytes > 1.8*tcp_ack_bytes) {
+	} else if ((cur+prior_ratio)/2 > 1.8) {
+		old_state = state;
+		state = STATE_SLOW_START;
+		printState(old_state, state);
+	//} else if (tcp_data_bytes > 0.8*tcp_ack_bytes) {
+	} else if ((cur+prior_ratio)/2 > 0.8) {
+		old_state = state;
+		state = STATE_CONG_AVOID;
+		printState(old_state, state);
+	} else {
+		//dbgprintf(0, "Cur: %e, Last: %e\n", cur, prior_ratio);
+		if (cur != 0) {
+			prior_ratio = (cur + prior_ratio)/2;
+		}
+		return;
+	}
+	
+	prior_ratio = cur;
 	tcp_ack_pkts = 0;
 	tcp_ack_bytes = 0;
 	tcp_ack_dup = 0;
@@ -328,7 +356,7 @@ void TCP::printState(int oldstate, int state)
 	if (oldstate == state) {
 		return;
 	}
-	dbgprintf(0, "[%s] state = %s, lp=%lu.%06lu\n", timestamp(buf,40), state_strings[state], holding.tv_sec, holding.tv_usec);
+	dbgprintf(0, "[%s] state = %s, lp=%lu.%06lu, il=%lu.%06lu\n", timestamp(buf,40), state_strings[state], holding1.tv_sec, holding1.tv_usec, holding2.tv_sec, holding2.tv_usec);
 }
 
 /* Stupid pthreads/C++ glue*/
@@ -360,17 +388,19 @@ void TCP::run()
 			break;
 		}
 
-		gettimeofday(&tm, NULL);
 		pthread_mutex_lock(&time_lock);
+		gettimeofday(&tm, NULL);
 		timersub(&tm,&last_packet,&diff_pkt);
 		timersub(&tm,&last_idle,&diff_idle);
 		pthread_mutex_unlock(&time_lock);
-		memcpy(&holding,&diff_pkt,sizeof(struct timeval));
+		memcpy(&holding1,&diff_pkt,sizeof(struct timeval));
+		memcpy(&holding2,&diff_idle,sizeof(struct timeval));
 
-		if ((diff_idle.tv_sec >= 0 || diff_idle.tv_usec >= 4*INT_TME) ||
-			(diff_pkt.tv_sec >=0 || diff_pkt.tv_usec >= INT_PKT)) {
+		if ((diff_idle.tv_sec > 0 || diff_idle.tv_usec >= 4*INT_TME*MSEC2USEC) ||
+			(diff_pkt.tv_sec > 0 || diff_pkt.tv_usec >= INT_PKT*MSEC2USEC) || urgent_event) {
 			pthread_rwlock_wrlock(&lock);
 			processClassicCongestionControl();
+			urgent_event = false;
 			pthread_rwlock_unlock(&lock);
 		}
 	}
