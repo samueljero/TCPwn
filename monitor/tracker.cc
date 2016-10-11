@@ -247,6 +247,11 @@ bool Tracker::openOutputSocket(struct sockaddr_in &addr)
 		close(sock);
 		sock = -1;
 	}
+
+	if (sock > 0) {
+		dbgprintf(1, "Established output connection...\n");
+	}
+
 	pthread_mutex_unlock(&lock);
 	return sock > 0;
 }
@@ -281,9 +286,14 @@ void Tracker::sendState(const char *state, const char* ip1, const char* ip2, con
 	m.len = 0;
 	m.len = snprintf(m.buff,m.alloc,"%s,%s,%s,0,0,STATE,state=%s\n", ip1, ip2, p, state);
 	if (m.len < 0 || m.len >= m.alloc) {
-		return;
+		goto out;
 	}
-	sendMsg(m);
+	if(!sendMsg(m)) {
+		close(sock);
+		sock = -1;
+	}
+
+out:
 	pthread_mutex_unlock(&lock);
 }
 

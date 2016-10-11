@@ -126,11 +126,11 @@ void TCP::updateTCPVars(Message hdr)
 	if (!(tcph->th_flags & TH_ACK)) {
 		return;
 	}
-	state = TCP_STATE_MID;
 
 	/* Is data bearing packet */
 	if (hdr.len > tcph->th_off*4) {
 		tcp_data_pkts++;
+		state = TCP_STATE_MID;
 	} else {
 		tcp_ack_pkts++;
 	}

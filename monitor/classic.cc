@@ -108,14 +108,12 @@ void Classic::processClassicCongestionControl()
 	}
 
 	if (p->isStart()) {
-		old_state = state;
 		state = STATE_INIT;
 		printState(old_state, state);
 		old_state = state;
 	}
 
 	if (p->isEnd()) {
-		old_state = state;
 		state = STATE_END;
 		printState(old_state, state);
 		old_state = state;
