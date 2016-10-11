@@ -469,7 +469,7 @@ class CCTester:
         strat = ""
         # Default strategy
         if strategy == None:
-            strategy = ["*,*,TCP,0,0,CLEAR,*","{0},{1},{2},0,0,CLEAR,*".format(config.target_client_ip, config.target_server_ip, config.protocol)]
+            strategy = ["*,*,TCP,0,0,*,CLEAR,*","{0},{1},{2},0,0,*,CLEAR,*".format(config.target_client_ip, config.target_server_ip, config.protocol)]
         ts = time.time()
 
         for l in strategy:

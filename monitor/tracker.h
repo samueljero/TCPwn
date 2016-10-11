@@ -37,7 +37,7 @@ class Tracker{
 		bool openOutputSocket(struct sockaddr_in &addr);
 		bool closeOutputSocket();
 		bool setAlgorithmAndProtocol(char *alg, char* proto);
-		void sendState(const char *state, const char* ip1, const char* ip2, const char* p);
+		void sendState(const char *state, const char* ip1, const char* ip2, const char* proto);
 
 	private:
 		void parseEthernet(pkt_info pk, Message cur);

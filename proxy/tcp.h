@@ -1,5 +1,6 @@
 /******************************************************************************
  * Author: Samuel Jero <sjero@purdue.edu>
+ * TCP Congestion Control Proxy: TCP specific attack header
 ******************************************************************************/
 #ifndef _TCP_H
 #define _TCP_H
@@ -60,12 +61,14 @@ class TCP: public Proto {
 		TCP(uint32_t src, uint32_t dst);
 		~TCP();
 		virtual pkt_info new_packet(pkt_info pk, Message hdr);
-		virtual bool SetInject(unsigned long start, unsigned long stop, inject_info &info);
-		virtual bool SetDivision(unsigned long start, unsigned long stop, int bytes_per_chunk);
-		virtual bool SetDup(unsigned long start, unsigned long stop, int num);
-		virtual bool SetPreAck(unsigned long start, unsigned long stop, int amt, int method);
-		virtual bool SetRenege(unsigned long start, unsigned long stop, int amt, int growth);
-		virtual bool SetBurst(unsigned long start, unsigned long stop, int num);
+		virtual bool validState(const char* state);
+		virtual bool SetState(const char* state);
+		virtual bool SetInject(unsigned long start, unsigned long stop, const char* state, inject_info &info);
+		virtual bool SetDivision(unsigned long start, unsigned long stop, const char* state, int bytes_per_chunk);
+		virtual bool SetDup(unsigned long start, unsigned long stop, const char* state, int num);
+		virtual bool SetPreAck(unsigned long start, unsigned long stop, const char* state, int amt, int method);
+		virtual bool SetRenege(unsigned long start, unsigned long stop, const char* state, int amt, int growth);
+		virtual bool SetBurst(unsigned long start, unsigned long stop, const char* state, int num);
 		virtual bool Clear();
 		virtual bool SetPrint(bool on);
 		virtual bool GetDuration(timeval *tm);

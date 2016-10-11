@@ -87,11 +87,11 @@ class StrategyGenerator:
                 #Single Action strategies
                 for action,template,params,ignore in manipulations.selfish_receiver_actions:
                     for p in params:
-                        s = {'strat':[self._create_strat(src_ip,dst_ip,proto,0,0,action,template,p)], 'priority':0, 'retries':0}
+                        s = {'strat':[self._create_strat(src_ip,dst_ip,proto,0,0,"*",action,template,p)], 'priority':0, 'retries':0}
                         self.strat_lst.append(s)
                         for length in manipulations.length_full:
                             for start in manipulations.start_full:
-                                s = {'strat':[self._create_strat(src_ip,dst_ip,proto,start,start+length,action,template,p)], 'priority':0, 'retries':0}
+                                s = {'strat':[self._create_strat(src_ip,dst_ip,proto,start,start+length,"*",action,template,p)], 'priority':0, 'retries':0}
                                 self.strat_lst.append(s)
 
                 #Combinations of two
@@ -103,8 +103,8 @@ class StrategyGenerator:
                                     continue
                                 for a_p in a_params:
                                     for b_p in b_params:
-                                        s = {'strat':[ self._create_strat(src_ip,dst_ip,proto,a_start,a_start+manipulations.chunk_len,a_action,a_template,a_p),
-                                                       self._create_strat(src_ip,dst_ip,proto,b_start,b_start+manipulations.chunk_len,b_action,b_template,b_p)],
+                                        s = {'strat':[ self._create_strat(src_ip,dst_ip,proto,a_start,a_start+manipulations.chunk_len,"*",a_action,a_template,a_p),
+                                                       self._create_strat(src_ip,dst_ip,proto,b_start,b_start+manipulations.chunk_len,"*",b_action,b_template,b_p)],
                                              'priority':0, 'retries':0}
                                         self.strat_lst.append(s)
 		
@@ -112,9 +112,9 @@ class StrategyGenerator:
 		print "[%s] Strategies: %d" % (str(datetime.today()),len(self.strat_lst))
 
 
-        def _create_strat(self, src_ip, dst_ip, proto, start, end, action, p_template, p_arg):
+        def _create_strat(self, src_ip, dst_ip, proto, start, end, state, action, p_template, p_arg):
             args = p_template.format(p_arg)
-            strat = "%s,%s,%s,%d,%d,%s,%s" % (src_ip, dst_ip, proto, start, end, action, args)
+            strat = "%s,%s,%s,%d,%d,%s,%s,%s" % (src_ip, dst_ip, proto, start, end, state, action, args)
             return strat
 
         def _actions_compatible(self,action_a, action_b, start_a, start_b):

@@ -1,5 +1,6 @@
 /******************************************************************************
  * Author: Samuel Jero <sjero@purdue.edu>
+ * TCP Congestion Control Proxy: TCP specific attack code
  *****************************************************************************/
 #include "proxy.h"
 #include "attacker.h"
@@ -87,6 +88,12 @@ pkt_info TCP::drop(pkt_info pk) {
 	pk.valid = false;
 	pk.msg.buff = NULL;
 	return pk;
+}
+
+bool TCP::validState(const char* state)
+{
+	if (state) {}
+	return true;
 }
 
 pkt_info TCP::process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &dst)
@@ -502,7 +509,7 @@ void TCP::FinishBurst()
 }
 
 
-bool TCP::SetInject(unsigned long start, unsigned long stop, inject_info &info)
+bool TCP::SetInject(unsigned long start, unsigned long stop, const char* state, inject_info &info)
 {
 	info.start = start;
 	info.stop = stop;
@@ -514,7 +521,7 @@ bool TCP::SetInject(unsigned long start, unsigned long stop, inject_info &info)
 	} else {
 		injections.push_back(info);
 	}
-
+	if (!state) {}
 	return true;
 }
 
@@ -694,50 +701,55 @@ Message TCP::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info 
 	return pk;
 }
 
-bool TCP::SetDivision(unsigned long start, unsigned long stop, int bytes_per_chunk)
+bool TCP::SetDivision(unsigned long start, unsigned long stop, const char* state, int bytes_per_chunk)
 {
 	div_start = start;
 	div_stop = stop;
 	div_bpc = bytes_per_chunk;
 	do_div = true;
+	if (!state) {}
 	return true;
 }
 
-bool TCP::SetDup(unsigned long start, unsigned long stop, int num)
+bool TCP::SetDup(unsigned long start, unsigned long stop, const char* state, int num)
 {
 	dup_start = start;
 	dup_stop = stop;
 	dup_num = num;
 	do_dup = true;
+	if (!state) {}
 	return true;
 }
 
-bool TCP::SetPreAck(unsigned long start, unsigned long stop, int amt, int method)
+bool TCP::SetPreAck(unsigned long start, unsigned long stop, const char* state, int amt, int method)
 {
 	preack_start = start;
 	preack_stop = stop;
 	preack_amt = amt;
 	preack_method = method;
 	do_preack = true;
+	if (!state) {}
 	return true;
 }
 
-bool TCP::SetRenege(unsigned long start, unsigned long stop, int amt, int growth)
+bool TCP::SetRenege(unsigned long start, unsigned long stop, const char* state, int amt, int growth)
 {
 	renege_start = start;
 	renege_stop = stop;
 	renege_amt = amt;
 	renege_growth = growth;
 	do_renege = true;
+	if (!state) {}
 	return true;
 }
 
-bool TCP::SetBurst(unsigned long start, unsigned long stop, int num)
+bool TCP::SetBurst(unsigned long start, unsigned long stop, const char* state, int num)
 {
 	burst_start = start;
 	burst_stop = stop;
 	burst_num = num;
 	do_burst = true;
+	if (!state) {}
 	return true;
 }
 
@@ -783,6 +795,12 @@ bool TCP::GetBytes(unsigned long *bytes)
 	*bytes = total_bytes;
 	pthread_mutex_unlock(&lock);
 
+	return true;
+}
+
+bool TCP::SetState(const char* state)
+{
+	if (!state) {}
 	return true;
 }
 

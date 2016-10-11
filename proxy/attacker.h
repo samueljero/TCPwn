@@ -17,15 +17,16 @@
 #define ACTION_ID_MIN			0
 #define ACTION_ID_ACTIVE		0
 #define ACTION_ID_TIME			1
-#define ACTION_ID_INJECT		2
-#define ACTION_ID_DIV			3
-#define ACTION_ID_DUP			4
-#define ACTION_ID_PREACK		5
-#define ACTION_ID_RENEGE		6
-#define ACTION_ID_BURST			7
-#define ACTION_ID_PRINT			8
-#define ACTION_ID_CLEAR			9
-#define ACTION_ID_MAX			9
+#define ACTION_ID_STATE			2
+#define ACTION_ID_INJECT		3
+#define ACTION_ID_DIV			4
+#define ACTION_ID_DUP			5
+#define ACTION_ID_PREACK		6
+#define ACTION_ID_RENEGE		7
+#define ACTION_ID_BURST			8
+#define ACTION_ID_PRINT			9
+#define ACTION_ID_CLEAR			10
+#define ACTION_ID_MAX			10
 
 #define PROTO_ID_ERR (-1)
 #define PROTO_ID_MIN 0

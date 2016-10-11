@@ -3,7 +3,7 @@
 * TCP Congestion Control Proxy: Malicious Processing
 *
 * Rule Format:
-* src_ip,dst_ip,proto,start,stop,action,parms
+* src_ip,dst_ip,proto,start,stop,state,action,parms
 ******************************************************************************/
 #include "attacker.h"
 #include "iface.h"
@@ -26,11 +26,12 @@
 #include <climits>
 using namespace std;
 
-#define ATTACKER_ROW_NUM_FIELDS		7
+#define ATTACKER_ROW_NUM_FIELDS		8
 #define ATTACKER_ARGS_DELIM		'&'
 
 #define ACTION_ALIAS_ACTIVE		"ACTIVE"
 #define ACTION_ALIAS_TIME		"TIME"
+#define ACTION_ALIAS_STATE		"STATE"
 #define ACTION_ALIAS_INJECT 	"INJECT"
 #define ACTION_ALIAS_DIV 		"DIV"
 #define ACTION_ALIAS_DUP		"DUP"
@@ -86,6 +87,7 @@ bool Attacker::addCommand(Message m, Message *resp)
 	arg_node_t *targ;
 	int amt;
 	inject_info info;
+	char *state;
 
 	dbgprintf(2, "Received CMD: %s\n", m.buff);
 
@@ -128,19 +130,15 @@ bool Attacker::addCommand(Message m, Message *resp)
 		goto out;
 	}
 
-	if ((action_type = normalize_action_type(fields[5])) == ACTION_ID_ERR) {
+	state = fields[5];
+
+	if ((action_type = normalize_action_type(fields[6])) == ACTION_ID_ERR) {
 		dbgprintf(0,"Adding Command: unsupported malicious action \"%s\".\n", fields[5]);
 		ret = false;
 		goto out;
 	}
-	if (action_type != ACTION_ID_CLEAR && action_type != ACTION_ID_ACTIVE && 
-                                            (ip_src == IP_WILDCARD || ip_dst == IP_WILDCARD)) {
-		dbgprintf(0,"Adding Command: bad addresses \"%s\", \"%s\"\n", fields[0],fields[1]);
-		ret = false;
-		goto out;
-	}
 
-	args = args_parse(fields[6],ATTACKER_ARGS_DELIM);
+	args = args_parse(fields[7],ATTACKER_ARGS_DELIM);
 	if (!args) {
 		dbgprintf(0,"Adding Command: failed to parse arguments \"%s\"\n", fields[6]);
 		ret = false;
@@ -164,8 +162,20 @@ bool Attacker::addCommand(Message m, Message *resp)
 	}
 
 	/* Find or create object for this connection */
+	if (ip_src == IP_WILDCARD || ip_dst == IP_WILDCARD) {
+		dbgprintf(0,"Adding Command: bad addresses \"%s\", \"%s\"\n", fields[0],fields[1]);
+		ret = false;
+		goto unlock;
+	}
 	if ((obj = find_or_create_proto(ip_src,ip_dst,proto)) == NULL) {
 		dbgprintf(0,"Adding Command: failed to find/create object for connection");
+		ret = false;
+		goto unlock;
+	}
+	
+	/* Validate state */
+	if (!obj->validState(state)) {
+		dbgprintf(0,"Adding Command: invalid protocol state \"%s\"\n", state);
 		ret = false;
 		goto unlock;
 	}
@@ -246,13 +256,13 @@ bool Attacker::addCommand(Message m, Message *resp)
 				dbgprintf(0, "Adding INJECT Command: failed with bad arguments---start is zero and no addresses\n");
 				ret = false;
 			} else {
-				ret = obj->SetInject(start,stop,info);
+				ret = obj->SetInject(start,stop,state,info);
 			}
 			break;
 		case ACTION_ID_DIV:
 			targ = args_find(args, "bpc");
 			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
-				ret = obj->SetDivision(start,stop, targ->value.i);
+				ret = obj->SetDivision(start,stop,state,targ->value.i);
 			} else {
 				dbgprintf(0, "Adding DIV Command: failed with bad arguments (missing bpc tag)\n");
 				ret = false;
@@ -261,7 +271,7 @@ bool Attacker::addCommand(Message m, Message *resp)
 		case ACTION_ID_DUP:
 			targ = args_find(args, "num");
 			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
-				ret = obj->SetDup(start,stop,targ->value.i);
+				ret = obj->SetDup(start,stop,state,targ->value.i);
 			} else {
 				dbgprintf(0, "Adding DUP Command: failed with bad arguments (missing num tag)\n");
 				ret = false;
@@ -273,7 +283,7 @@ bool Attacker::addCommand(Message m, Message *resp)
 				amt = targ->value.i;
 				targ = args_find(args, "method");
 				if (targ && targ->type == ARG_VALUE_TYPE_INT) {
-					ret = obj->SetPreAck(start, stop, amt, targ->value.i);
+					ret = obj->SetPreAck(start, stop, state, amt, targ->value.i);
 				} else {
 					dbgprintf(0, "Adding PREACK Command: failed with bad arguments (missing method tag)\n");
 					ret = false;
@@ -289,7 +299,7 @@ bool Attacker::addCommand(Message m, Message *resp)
 				amt = targ->value.i;
 				targ = args_find(args, "growth");
 				if (targ && targ->type == ARG_VALUE_TYPE_INT) {
-					ret = obj->SetRenege(start,stop,amt,targ->value.i);
+					ret = obj->SetRenege(start,stop,state,amt,targ->value.i);
 				} else {
 					dbgprintf(0, "Adding RENEGE Command: failed with bad arguments (missing growth tag)\n");
 					ret = false;
@@ -302,7 +312,7 @@ bool Attacker::addCommand(Message m, Message *resp)
 		case ACTION_ID_BURST:
 			targ = args_find(args,"num");
 			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
-				ret = obj->SetBurst(start,stop,targ->value.i);
+				ret = obj->SetBurst(start,stop,state,targ->value.i);
 			} else {
 				dbgprintf(0, "Adding BURST Command: failed with bad arguments (missing num tag)\n");
 				ret = false;
@@ -319,9 +329,15 @@ bool Attacker::addCommand(Message m, Message *resp)
 			break;
 		case ACTION_ID_CLEAR:
 			obj->Clear();
+			goto unlock;
 			break;
 		case ACTION_ID_TIME:
 			get_conn_duration(obj, resp);
+			goto unlock;
+			break;
+		case ACTION_ID_STATE:
+			obj->SetState(state);
+			goto unlock;
 			break;
 	}
 
@@ -439,6 +455,7 @@ int Attacker::normalize_action_type(char *s)
 	}
 	if (!strcmp(ACTION_ALIAS_ACTIVE,s)) return ACTION_ID_ACTIVE;
 	if (!strcmp(ACTION_ALIAS_TIME,s)) return ACTION_ID_TIME;
+	if (!strcmp(ACTION_ALIAS_STATE,s)) return ACTION_ID_STATE;
 	if (!strcmp(ACTION_ALIAS_INJECT,s)) return ACTION_ID_INJECT;
 	if (!strcmp(ACTION_ALIAS_DIV,s)) return ACTION_ID_DIV;
 	if (!strcmp(ACTION_ALIAS_DUP,s)) return ACTION_ID_DUP;
