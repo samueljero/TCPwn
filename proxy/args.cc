@@ -9,7 +9,7 @@
 #include <string.h>
 #include "args.h"
 
-int is_int(char *v) {
+int is_int(const char *v) {
 	if (*v == '\0') return 0;
 	while (*v != '\0') {
 		if (*v < '0' || *v > '9') return 0;

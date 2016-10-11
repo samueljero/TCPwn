@@ -38,7 +38,7 @@ typedef struct arg_node {
 /**
  * Determine if the C string represents an integer.
  */
-int is_int(char *);
+int is_int(const char *);
 
 /**
  * Return -1 if the string is not a number. 0 if int. 1 if float.

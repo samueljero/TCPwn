@@ -10,6 +10,17 @@
 #include <list>
 #include <utility>
 
+#define TCP_STATE_ERR (-1)
+#define TCP_STATE_MIN 0
+#define TCP_STATE_UNKNOWN 0
+#define TCP_STATE_INIT 1
+#define TCP_STATE_SLOW_START 2
+#define TCP_STATE_CONG_AVOID 3
+#define TCP_STATE_FAST_RECOV 4
+#define TCP_STATE_RTO 5
+#define TCP_STATE_END 6
+#define TCP_STATE_ANY 7
+#define TCP_STATE_MAX 7
 
 class tcp_half {
 	public:
@@ -31,30 +42,22 @@ class tcp_half {
 	uint32_t preack_save;
 };
 
-class Injector {
+class TCPModifier {
 	public:
-		Injector(pkt_info pk, Message hdr, inject_info &info);
-		~Injector();
-		unsigned long GetStop() {return stop;}
-		bool Start();
-		bool Stop();
+		virtual ~TCPModifier(){};
+		virtual bool shouldApply(unsigned long pktnum, int state) = 0;
+		virtual pkt_info apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst) = 0;
+		virtual bool Stop() = 0;
 
-	private:
-		static void* thread_run(void *arg);
-		void _run();
-		pthread_t thread;
-		bool running;
-		bool thread_running;
-		pkt_info pk;
-		Message ip_payload;
-		int method;
-		int freq;
-		enum direction dir;
+	protected:
+		bool in_pkt_range(unsigned long pkt);
+		bool is_state(int active_state);
+		pkt_info drop(pkt_info pk);
+
 		unsigned long start;
 		unsigned long stop;
-		pthread_mutex_t timeout_mutex;
+		int state;
 };
-
 
 class TCP: public Proto {
 	public:
@@ -77,61 +80,117 @@ class TCP: public Proto {
 	private:
 		pkt_info process_packet(pkt_info pk, Message hdr, tcp_half &src, tcp_half &dst);
 		void init_conn_info(pkt_info pk, struct tcphdr *tcph, tcp_half &src, tcp_half &dst);
-		bool in_pkt_range(unsigned long pkt, unsigned long start, unsigned long stop);
 		void update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src);
 		void update_conn_times(struct tcphdr *tcph, Message msg, pkt_info pk);
-		pkt_info PerformPreAck(pkt_info pk, Message hdr, tcp_half &src, tcp_half &dst);
-		pkt_info PerformRenege(pkt_info pk, Message hdr, tcp_half &src);
-		pkt_info PerformDivision(pkt_info pk, Message hdr, tcp_half &old_src);
-		pkt_info PerformDup(pkt_info pk, Message hdr);
-		pkt_info PerformBurst(pkt_info pk, Message hdr);
+		int normalize_state(const char *s);
+
+		bool do_print;
+		tcp_half fwd;
+		tcp_half rev;
+		unsigned long total_pkts;
+		unsigned long total_bytes;
+		int protocol_state;
+		/* Lists already protected by locks in Attacker */
+		std::list<TCPModifier*> mod1;
+		std::list<TCPModifier*> mod2;
+		timeval start;
+		timeval end;
+		timeval last;
+		pthread_mutex_t lock;
+};
+
+class TCPDiv: public TCPModifier {
+	public:
+		TCPDiv(unsigned long start, unsigned long stop, int state, int div_bpc);
+		virtual ~TCPDiv() {}
+		virtual bool shouldApply(unsigned long pktnum, int state);
+		virtual pkt_info apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst);
+		virtual bool Stop() {return true;}
+	
+	private:
+		int div_bpc;
+};
+
+class TCPDup: public TCPModifier {
+	public:
+		TCPDup(unsigned long start, unsigned long stop, int state, int dup_num);
+		virtual ~TCPDup() {}
+		virtual bool shouldApply(unsigned long pktnum, int state);
+		virtual pkt_info apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst);
+		virtual bool Stop() {return true;}
+
+	private:
+		int dup_num;
+};
+
+class TCPPreAck: public TCPModifier {
+	public:
+		TCPPreAck(unsigned long start, unsigned long stop, int state, int preack_amt, int preack_method);
+		virtual ~TCPPreAck(){}
+		virtual bool shouldApply(unsigned long pktnum, int state);
+		virtual pkt_info apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst);
+		virtual bool Stop() {return true;}
+
+	private:
+		int preack_amt;
+		int preack_method;
+};
+
+class TCPRenege: public TCPModifier {
+	public:
+		TCPRenege(unsigned long start, unsigned long stop, int state, int renege_amt, int renege_growth);
+		virtual ~TCPRenege(){}
+		virtual bool shouldApply(unsigned long pktnum, int state);
+		virtual pkt_info apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst);
+		virtual bool Stop() {return true;}
+
+	private:
+		int renege_amt;
+		int renege_growth;
+};
+
+class TCPBurst: public TCPModifier {
+	public:
+		TCPBurst(unsigned long start, unsigned long stop, int state, int burst_num);
+		~TCPBurst();
+		virtual bool shouldApply(unsigned long pktnum, int state);
+		virtual pkt_info apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst);
+		virtual bool Stop() {return true;}
+
+	private:
 		void FinishBurst();
+		std::list<std::pair<pkt_info,Message> > burst_pkts;
+		pthread_mutex_t burst_mutex;
+		int burst_num;
+};
+
+class TCPInject: public TCPModifier {
+	public:
+		TCPInject(unsigned long start, unsigned long stop, int state, inject_info &info);
+		~TCPInject();
+		virtual bool shouldApply(unsigned long pktnum, int state);
+		virtual pkt_info apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst);
+		virtual bool Stop();
+
+	private:
+		bool Start();
 		bool BuildPacket(pkt_info &pk, Message &hdr, inject_info &info);
 		Message BuildEthHeader(Message pk, char* src, char* dst, int next);
 		Message BuildIPHeader(Message pk, uint32_t src, uint32_t dst, int next);
 		Message BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info &info, Message &ip_payload, uint32_t ipsrc, uint32_t ipdst);
-		bool StartInjector(inject_info &info);
-		pkt_info drop(pkt_info pk);
+		static void* thread_run(void *arg);
+		void _run();
 
-		tcp_half fwd;
-		tcp_half rev;
+		inject_info info;
+		pkt_info pk;
+		Message msg;
+		tcp_half* fwd;
+		tcp_half* rev;
 
-		bool do_div;
-		bool do_dup;
-		bool do_preack;
-		bool do_renege;
-		bool do_burst;
-		bool do_print;
-
-		unsigned long div_start;
-		unsigned long div_stop;
-		unsigned long dup_start;
-		unsigned long dup_stop;
-		unsigned long preack_start;
-		unsigned long preack_stop;
-		unsigned long renege_start;
-		unsigned long renege_stop;
-		unsigned long burst_start;
-		unsigned long burst_stop;
-
-		int div_bpc;
-		int dup_num;
-		int preack_amt;
-		int preack_method;
-		int renege_amt;
-		int renege_growth;
-		int burst_num;
-		std::list<std::pair<pkt_info,Message> > burst_pkts;
-		pthread_mutex_t burst_mutex;
-		std::list<inject_info> injections;
-		std::list<Injector*> active_injectors;
-		pthread_mutex_t lock;
-
-		unsigned long total_pkts;
-		unsigned long total_bytes;
-		timeval start;
-		timeval end;
-		timeval last;
+		pthread_t thread;
+		bool running;
+		bool thread_running;
+		pthread_mutex_t timeout_mutex;
 };
 
 #endif

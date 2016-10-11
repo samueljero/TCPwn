@@ -27,6 +27,7 @@ class inject_info {
 	enum direction dir;
 	unsigned long start;
 	unsigned long stop;
+	int state;
 };
 
 class Proto {
