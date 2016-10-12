@@ -679,7 +679,7 @@ class CCTester:
     def _query_proxy_conn_info(self):
         length = 0
         total_data = 0
-        cmd = "{0},{1},{2},0,0,TIME,*".format(config.target_client_ip, config.target_server_ip,config.protocol)
+        cmd = "{0},{1},{2},0,0,*,TIME,*".format(config.target_client_ip, config.target_server_ip,config.protocol)
         for t in self.tc:
             res = self._proxy_communicate((mv.vm2ip(t), config.proxy_com_port), cmd, wait_for_response=True)
             if type(res) is bool and res is False:
@@ -699,7 +699,7 @@ class CCTester:
 
     def _query_proxy_done(self):
         last = 0
-        cmd = "*,*,{0},0,0,ACTIVE,*".format(config.protocol)
+        cmd = "*,*,{0},0,0,*,ACTIVE,*".format(config.protocol)
         for t in self.tc:
             res = self._proxy_communicate((mv.vm2ip(t), config.proxy_com_port), cmd, wait_for_response=True)
             if type(res) is bool and res is False:
