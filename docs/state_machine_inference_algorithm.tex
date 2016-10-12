@@ -1,0 +1,86 @@
+\section{State Machine Inference}
+To effectively perform our testing, we need some information about the sender's
+current state in the Congestion Control State Machine. Importantly, we want to
+infer this state \emph{without} modifying the sender or making assumptions about
+being able to get debug info out of it. To accomplish this, we have developed
+an algorithm to probabilistically identify the sender's current state. We make
+a key simplifying assumption in assuming that the only possible states are
+\texttt{SlowStart}, \texttt{CongestionAvoidance}, \texttt{FastRecovery}, and
+\texttt{RTO}. In particular, we do not handle the case where a sender may be
+application limited nor do we attempt to differentiate TLP's from RTO's and we
+assume that PRR is not being used. This will work best with New Reno TCP without
+any additional optimizations performing a bulk transfer. Despite there being
+many ways for this prediction to be incorrect, it works surprisingly well for
+more complex TCP's.
+
+\begin{algorithm} %[!t]
+\DontPrintSemicolon
+\SetKwProg{Fn}{Function}{}{}
+\SetKwFunction{FInit}{Init}
+\SetKwFunction{FOnPacket}{OnPacket}
+\SetKwFunction{FOnTimer}{OnTimer}
+\SetKwFunction{Fnow}{now}
+
+\Fn(){\FInit{}}{
+	Start timer $intervalTimer$ to expire every 10ms\;
+	$lastPacket$ = \Fnow{}\;
+	$urgentEvent$ = false\;
+	$state$ = STATE\_UNKNOWN\;
+}
+
+\Fn(){\FOnPacket{p}}{
+	update $dataBytes$, $dataPkts$, $ackBytes$, $ackPkts$, $seqHigh$, $highAck$,
+	$lastPktType$ and $retransmits$ based on $p$\;
+	
+	\If{$lastPacket$ < \Fnow{} - 5ms}{
+		$lastIdle$ = \Fnow{}\;
+	}
+	$lastPacket$ = \Fnow{}\;
+	Reset timer $packetTimer$ to expire in 5ms\;
+	
+	\If{$retransmits$ > 0} {
+		$urgentEvent$ = true\;
+		Reset timer $packetTimer$ to expire now\;
+	}
+}
+
+\Fn(\tcc{Called when either timer expires}){\FOnTimer{}}{
+	\If{$urgentEvent$ or $lastPacket$ > 5ms or $lastIdle$ > 40ms}{
+		$urgentEvent$ = false\;
+		\If{$lastPktType$ == SYN}{
+			$state$ = STATE\_INIT\;
+			return\;
+		}
+		\If{$lastPktType$ == FIN or $lastPktType$ == RST}{
+			$state$ = STATE\_END\;
+			return\;
+		}
+		
+		$currentRatio$ = $dataBytes$ / $ackBytes$\;
+		
+		\If{$ackPkts$ == 0 and $dataPkts$ > 0 and $dataPkts$ < 10} {
+			$state$ = STATE\_RTO\;
+		} \ElseIf{$state$ == STATE\_FAST\_RECOV and $ackHigh$ < $ackHold$} {
+			$state$ = STATE\_FAST\_RECOV\;
+		} \ElseIf {$retransmits$ > 0 or ($ackBytes$ == 0 and $ackPkts$ > 3)} {
+			$ackHold$ = $seqHigh$\;
+			$state$ = STATE\_FAST\_RECOV\;
+		} \ElseIf{$(currentRatio+priorRatio)/2$ > 1.8} {
+			$state$ = STATE\_SLOW\_STATE\;
+		} \ElseIf {$(currentRatio+priorRatio)/2$ > 0.8} {
+			$state$ = STATE\_CONG\_AVOID\;
+		} \Else {
+			$priorRatio$ = $(currentRatio+priorRatio)/2$\;
+			return\;
+		}
+		
+		$priorRatio$ = $currentRatio$\;
+		$ackPkts$ = 0\;
+		$ackBytes$ = 0\;
+		$dataPkts$ = 0\;
+		$dataBytes$ = 0\;
+		$retransmits$ = 0\;
+	}
+	return\;
+}
+\end{algorithm}

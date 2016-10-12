@@ -1,0 +1,156 @@
+\section{Model-based Attack Generation}
+
+One of the main challenges to solving this problem is how to generate effective test cases (\ie, attacks)
+since there is an exponential number of possible test cases.
+To overcome this challenge, we devise a model-guided attack generation technique
+that focuses on testing only important aspects of the congestion control technique.
+The key insights behind our approach are: (i) the model of a congestion control technique
+essentially describes how it transitions through different states and
+takes appropriate actions to deal with the current network condition
+and (ii) the attacker induces the victim to take some actions that are not
+appropriate in the current context but favorable for the attacker.
+Depending on the attacker's goal (\eg, increase or decrease throughput),
+we utilize the user-provided model to find the paths containing
+the vulnerable actions that the attacker wants the victim to perform.
+These paths provide us some potential abstract test cases, which 
+in turn need to be converted to concrete ones before conducting the actual
+test using our platform.
+
+\subsection*{Algorithm}
+
+\paragraph{Problem definition} Given a directed \textbf{cyclic} graph (\ie, the model), we need to 
+find all paths containing specific edge labels (\ie, actions) starting from the root node.
+
+\paragraph{Background} 
+%The characteristics of 
+The graph ($G = \langle V, E \rangle$):
+\begin{itemize}
+  \item
+  is a directed graph
+  \item
+  Contains cycles (makes the problem challenging)
+  \item 
+  By specific edge label, we mean only the action part of an edge label.
+  %In other words, a specific edge label is vulnerable action
+  \item 
+  One vulnerable action can appear on multiple edges. 
+  Formally, a vulnerable action $A$ can appear $(x, y) \in E$ for any $x, y \in V$
+\end{itemize}
+  
+
+\paragraph{Requirements}  
+\begin{itemize}
+  \item
+  A desired goal of the attacker may require a combination of one or more vulnerable actions to take place. 
+  For now, we assume a goal maps to only one vulnerable action.
+  \item
+  The desired path must contain an edge with the vulnerable action
+  \item
+  To obtain a path that can generate a test case with repeated attacks, 
+  the path must contain a vulnerable action edge as a part of a cycle. 
+  The cycle dictates the repetition of the attack.
+\end{itemize}
+
+Our algorithm is shown in Algorithm~\ref{algorithm:modelsearch}.
+
+\begin{algorithm} %[!t]
+\DontPrintSemicolon
+\SetKwProg{Fn}{Function}{}{}
+\SetKwFunction{FMain}{Main}
+\SetKwFunction{FScan}{Scan}
+
+
+%\small
+ \tcc{{Objective}: Find all paths containing a specific action in a given graph (model)}
+ \KwIn{Graph $G = (V,E)$ and action $A$}
+ \KwOut{All paths containing $A$ }
+ 
+ \BlankLine 
+ \BlankLine
+ 
+ \tcc{
+ $adj: (V \times E) \mapsto V$. For example, 
+ if there is an edge $e$ between nodes $u$ and $v$, then $adj(u, e) = v$.}
+ \tcc{
+ Global variable \pred{ResultPaths} contains all the resulted paths 
+ }
+ 
+ \BlankLine 
+ \BlankLine
+ 
+ \Fn(\tcc* {program starts here}){\FMain {$G, A$}}{
+	$root$ = getRoot($G$)\;
+	Mark $root$ as \pred{visited} \;
+	\ForEach{edge $e$ starting at $root$}{
+		Create a new path $P$ and add $(root, e)$ to $P$ \;
+		$v$ = $adj(root, e)$ \;
+		\FScan{$v, P, A$} \;
+	}
+	\If{\pred{ResultPaths} is not empty}{
+		\KwRet \pred{ResultPaths}
+	}
+ }
+ 
+ \BlankLine
+  \BlankLine
+  
+ \Fn(\tcc*{search continue from $v$}){\FScan {$v, P, A$}}{
+ 	$base\_case$ = \pred{false} \;
+ 	\If(\tcc*[h]{reached a cycle}){$v$ is already \pred{visited}}{
+ 		$base\_case$ = \pred{true} \;
+ 	}
+ 	\ElseIf(\tcc*[h]{has no child}){$v$ is a leaf node}{
+ 		$base\_case$ = \pred{true} \;
+ 		Add $(v, \bot)$ to $P$ \;
+ 	}
+ 	\If{$base\_case$ is \pred{true}}{
+ 		\If{$P$ contains any edge with $A$}{
+ 			Add $P$ to \pred{ResultPaths} \;
+ 		}
+ 	}
+ 	\Else{
+ 		Mark $v$ as \pred{visited} \;
+ 		\ForEach{edge $e$ starting at $v$}{
+ 			$v'$ = $adj(v, e)$ \;
+ 			$P'$ = $copy(P)$ \;
+ 			Add $(v', e)$ to $P'$ \;
+ 			\FScan{$v', P', A$}
+ 		}
+ 		Mark $v$ as \pred{unvisited} \;
+ 	}
+ 	\KwRet \tcc*{void}
+ }
+
+% \Fn(\tcc*[h]{search continue from $v$}){\FScan {$v, P, A$}}{
+% Queue $W_e \gets \emptyset$; FSM $M \gets \emptyset$\;
+% Create initial program state $e_0$\;
+%% \tcp{$q_0$ is the initial protocol FSM state}
+% $q_0\gets\pred{ExtractFsmState}(e_0);$~~~$//q_0:$ initial protocol state\\
+% $W_e.\pred{enqueue}(e_0);$\\
+% $M.Q\gets \{q_0\};$ ~~~$//M.Q:$ set of states\\
+% $M.q_I\gets q_0;$ ~~~~~~$//M.q_I:$ initial state\\
+% $M.R\gets \emptyset;$ ~~~~~~~~$//M.R:$ set of transitions\\
+% Mark state $q_0$ as old\;
+% \While{$W_e \neq\emptyset$}{
+%  $e_i \gets W_e.\pred{dequeue}()$\;
+%  $q_i \gets \pred{ExtractFsmState}(e_i)$\;
+%  \ForEach{Event $\tau\in \pred{EventList}$}{
+%    $S_q\gets \pred{SymbolicExecution}(S, C, N, e_i,\tau)$\;
+%    \ForEach{$\langle e_j, c, a\rangle\in S_q$}{
+%        $q_j\gets \pred{ExtractFsmState}(e_j)$\;
+%        \If{$q_j$ is not old}{
+%         $W_e.\pred{enqueue}(e_j)$\;
+%         $M.Q\gets M.Q\cup \{q_j\}$\;
+%         Mark state $q_j$ as old \;
+%        }
+%        \If{Transition $\langle q_i, \tau, c, a, q_j\rangle$ is not old}{
+%           $M.R\gets M.R\cup \{\langle q_i, \tau, c, a, q_j\rangle\}$\;
+%           Mark transition $\langle q_i, \tau, c, a, q_j\rangle$ as old \;
+%        }
+%    }
+%  }
+% }
+% \Return $M$
+% }
+ \caption{Find Vulnerable Paths\label{algorithm:modelsearch}} 
+\end{algorithm}
