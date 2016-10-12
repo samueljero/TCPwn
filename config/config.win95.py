@@ -45,6 +45,7 @@ background_client_ip = "10.0.3.2"
 #Coordinator
 coordinator_port = 3333
 failed_retries = 1
+coord_strategy_generation_algorithm = "BruteForce"
 coord_checkpoint_file = system_home + "/logs/coord.ck"
 coord_log = system_home + "/logs/coord.log"
 coord_results_log = system_home + "/logs/results.log"
