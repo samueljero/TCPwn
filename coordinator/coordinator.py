@@ -226,8 +226,8 @@ def main(args):
         mode = "a"
     else:
         mode = "w"
-	if args['load'] == True:
-		args['algorithm'] = "FromFile"
+    if args['load'] == True:
+        args['algorithm'] = "FromFile"
     print "Starting Coordinator..."
 
     # Open Log file
@@ -243,12 +243,12 @@ def main(args):
     # Create Strategy Generator
     if args['algorithm'] == "BruteForce":
         strat_gen = BruteForce(lg, res_lg)
-	#elif args['algorithm'] == "FromFile":
-	#	# Load fixed list of strategies
-    #    print "Loading Strategies from File..."
-    #    lg.write("[%s] Loading Strategies from File\n" % (str(datetime.today())))
-    #    f = open(args['load'], "r")
-	#	strat_gen = FromFile(lg, res_lg, f)
+    elif args['algorithm'] == "FromFile":
+    # Load fixed list of strategies
+        print "Loading Strategies from File..."
+        lg.write("[%s] Loading Strategies from File\n" % (str(datetime.today())))
+        f = open(args['load'], "r")
+        strat_gen = FromFile(lg, res_lg, f)
     else:
         print "Error: Unknown Strategy Generation Algorithm %s" % args['algorithm']
         return
