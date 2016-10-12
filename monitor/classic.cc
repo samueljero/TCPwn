@@ -143,7 +143,7 @@ void Classic::processClassicCongestionControl()
 		state = STATE_FAST_RECOV;
 		printState(old_state, state);
 	//} else if (cur < 0.8 && p->Retransmissions() > 0) {
-	} else if (p->Retransmissions() > 0) {
+	} else if (p->Retransmissions() > 0 || (p->AckBytes() == 0 && p->AckPkts() > 3)) {
 		if (state != STATE_FAST_RECOV) {
 			p->setAckHolds();
 		}

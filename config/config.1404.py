@@ -28,7 +28,7 @@ proxy_kill_cmd = "pkill proxy"
 
 #Monitor
 monitor_com_port = 4444
-monitor_cmd = "/root/monitor/monitor -i eth1 -i eth2 -v -p {port}"
+monitor_cmd = "/root/monitor/monitor -i eth1 -i eth2 -v -p {port} -o {proxy}:{proxyport}"
 monitor_kill_cmd = "pkill monitor"
 
 #Servers

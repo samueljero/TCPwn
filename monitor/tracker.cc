@@ -284,7 +284,7 @@ void Tracker::sendState(const char *state, const char* ip1, const char* ip2, con
 	m.buff = buff;
 	m.alloc = 100;
 	m.len = 0;
-	m.len = snprintf(m.buff,m.alloc,"%s,%s,%s,0,0,%s,STATE,*\n", ip1, ip2, proto, state);
+	m.len = snprintf(m.buff,m.alloc,"%s,%s,%s,0,0,%s,STATE,*", ip1, ip2, proto, state);
 	if (m.len < 0 || m.len >= m.alloc) {
 		goto out;
 	}

@@ -100,15 +100,15 @@ class CCTester:
         #Cleanup anything leftover from prior tests
         self._cleanup()
 
-        #Start monitor
-        monitor = self._start_monitor()
-        if monitor is None:
-            return (False, "System Failure")
-
         # Start Proxy
         proxy = self._start_proxy()
         if proxy is None:
             self._stop_monitor(monitor)
+            return (False, "System Failure")
+
+        #Start monitor
+        monitor = self._start_monitor()
+        if monitor is None:
             return (False, "System Failure")
 
         # Send Proxy Strategy
@@ -158,12 +158,12 @@ class CCTester:
                 result[0] = False
                 result[1] = "Performance -- Slower"
 
-        # Stop Proxy
-        if not self._stop_proxy(proxy):
-            return (False, "System Failure")
-
         # Stop Monitor
         if not self._stop_monitor(monitor):
+            return (False, "System Failure")
+
+        # Stop Proxy
+        if not self._stop_proxy(proxy):
             return (False, "System Failure")
 
         # Cleanup anything still around
@@ -247,7 +247,7 @@ class CCTester:
     def _start_monitor(self):
         monitor = None
         ts = time.time()
-        cmd = config.monitor_cmd.format(port = str(config.monitor_com_port))
+        cmd = config.monitor_cmd.format(port = str(config.monitor_com_port),proxy=mv.vm2ip(self.tc[0]),proxyport=str(config.proxy_com_port))
         self.log.write("Monitor CMD: " + cmd + "\n")
         
         shell = spur.SshShell(hostname = mv.vm2ip(self.mon[0]),username = config.vm_user,
