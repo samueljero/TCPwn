@@ -16,8 +16,8 @@ from datetime import datetime
 import SocketServer as ss
 import argparse
 import threading
-from bruteForce import BruteForce
-from fromFile import FromFile
+from simpleGenerators import BruteForce, FromFile
+from stateBased import StateBased
 
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 config_path = os.path.abspath(os.path.join(system_home, 'config'))
@@ -244,11 +244,10 @@ def main(args):
     if args['algorithm'] == "BruteForce":
         strat_gen = BruteForce(lg, res_lg)
     elif args['algorithm'] == "FromFile":
-    # Load fixed list of strategies
-        print "Loading Strategies from File..."
-        lg.write("[%s] Loading Strategies from File\n" % (str(datetime.today())))
         f = open(args['load'], "r")
         strat_gen = FromFile(lg, res_lg, f)
+    elif args['algorithm'] == "StateBased":
+	strat_gen = StateBased(lg, res_lg)
     else:
         print "Error: Unknown Strategy Generation Algorithm %s" % args['algorithm']
         return
