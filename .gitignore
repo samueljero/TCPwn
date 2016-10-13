@@ -5,6 +5,7 @@
 /proxy/proxy
 /monitor/sndcmd
 /monitor/monitor
+/state_searcher/bin/*
 executor/libs/scapy/VERSION
 /config/config.py
 
