@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FSM>
+	<States>
+		<State name = "SlowStart"/>
+		<State name = "CongestionAvoidance"/>
+		<State name = "FastRecovery"/>
+		<State name = "ExponentialBackoff"/>
+	</States>
+	<Transitions>
+		<Transition>
+			<CurrentState>SlowStart</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>new</Condition>
+				<Condition>cwnd + MSS &gt;= ssthresh</Condition>
+			</Conditions>
+			<Actions>
+				<Action>dupACKctr = 0</Action>
+				<Action>cwnd = cwnd + MSS</Action>
+				<Action>If new RTT sample, update rto_timeout</Action>
+				<Action>reset RTO timer</Action>
+				<Action>send packets</Actions>
+			</Actions>
+			<NextState>CongestionAvoidance</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>SlowStart</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>dup</Condition>
+				<Condition>dupACKctr+1 == 3</Condition>
+			</Conditions>
+			<Actions>
+				<Action>dupACKctr = 0</Action>
+				<Action>ssthresh = cwnd/2</Action>
+				<Action>high_water = last packet sent</Action>
+				<Action>reset RTO timer</Action>
+				<Action>retransmit last unacked packet</Actions>
+			</Actions>
+			<NextState>FastRecovery</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>SlowStart</CurrentState>
+			<Conditions>
+				<Condition>RTO Timeout</Condition>
+			</Conditions>
+			<Actions>
+				<Action>ssthresh = cwnd/2</Action>
+				<Action>cwnd = 1</Action>
+				<Action>rto_timeout = rto_timeout*2</Action>
+				<Action>reset RTO timer</Action>
+				<Action>retransmit last unacked packet</Actions>
+			</Actions>
+			<NextState>ExponentialBackoff</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>SlowStart</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>dup</Condition>
+				<Condition>dupACKctr &lt; 2 </Condition>
+			</Conditions>
+			<Actions>
+				<Action>dupACKctr++</Action>
+				<Action>reset RTO timer</Action>
+			</Actions>
+			<NextState>SlowStart</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>SlowStart</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>new</Condition>
+				<Condition>cwnd+MSS &lt; ssthresh</Condition>
+			</Conditions>
+			<Actions>
+				<Action>dupACKctr = 0</Action>
+				<Action>cwnd = cwnd + MSS</Action>
+				<Action>If new RTT sample, update rto_timeout</Action>
+				<Action>reset RTO timer</Action>
+				<Action>Send packets</Actions>
+			</Actions>
+			<NextState>SlowStart</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>CongestionAvoidance</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>dup</Condition>
+				<Condition>dupACKctr &lt; 2 </Condition>
+			</Conditions>
+			<Actions>
+				<Action>dupACKctr++</Action>
+				<Action>reset RTO timer</Action>
+			</Actions>
+			<NextState>CongestionAvoidance</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>CongestionAvoidance</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>new</Condition>
+			</Conditions>
+			<Actions>
+				<Action>dupACKctr = 0</Action>
+				<Action>cwnd = cwnd + MSS*(MMS/cwnd)</Action>
+				<Action>If new RTT sample, update rto_timeout</Action>
+				<Action>reset RTO timer</Action>
+				<Action>Send packets</Actions>
+			</Actions>
+			<NextState>CongestionAvoidance</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>CongestionAvoidance</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>dup</Condition>
+				<Condition>dupACKctr+1 == 3</Condition>
+			</Conditions>
+			<Actions>
+				<Action>dupACKctr = 0</Action>
+				<Action>ssthresh = cwnd/2</Action>
+				<Action>high_water = last packet sent</Action>
+				<Action>reset RTO timer</Action>
+				<Action>retransmit last unacked packet</Actions>
+			</Actions>
+			<NextState>FastRecovery</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>CongestionAvoidance</CurrentState>
+			<Conditions>
+				<Condition>RTO Timeout</Condition>
+			</Conditions>
+			<Actions>
+				<Action>ssthresh = cwnd/2</Action>
+				<Action>cwnd = 1</Action>
+				<Action>rto_timeout = rto_timeout*2</Action>
+				<Action>reset RTO timer</Action>
+				<Action>retransmit last unacked packet</Actions>
+			</Actions>
+			<NextState>ExponentialBackoff</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>FastRecovery</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>new</Condition>
+				<Condition>pkt.ack &lt; high_water</Condition>
+			</Conditions>
+			<Actions>
+				<Action>cwnd = cwnd - data acknowledged</Action>
+				<Action>reset RTO timer</Action>
+				<Action>retransmit last unacked packet</Actions>
+				<Action>Send packets</Actions>
+			</Actions>
+			<NextState>FastRecovery</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>FastRecovery</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>dup</Condition>
+			</Conditions>
+			<Actions>
+				<Action>cwnd = cwnd + MSS</Action>
+				<Action>reset RTO timer</Action>
+				<Action>Send packets</Actions>
+			</Actions>
+			<NextState>FastRecovery</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>FastRecovery</CurrentState>
+			<Conditions>
+				<Condition>RTO Timeout</Condition>
+			</Conditions>
+			<Actions>
+				<Action>ssthresh = cwnd/2</Action>
+				<Action>cwnd = 1</Action>
+				<Action>rto_timeout = rto_timeout*2</Action>
+				<Action>reset RTO timer</Action>
+				<Action>retransmit last unacked packet</Actions>
+			</Actions>
+			<NextState>ExponentialBackoff</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>FastRecovery</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+				<Condition>new</Condition>
+				<Condition>pkt.ack &gt;= high_water</Condition>
+			</Conditions>
+			<Actions>
+				<Action>cwnd = ssthresh</Action>
+				<Action>dupACKctr = 0</Action>
+				<Action>reset RTO timer</Action>
+			</Actions>
+			<NextState>CongestionAvoidance</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>ExponentialBackoff</CurrentState>
+			<Conditions>
+				<Condition>RTO Timeout</Condition>
+			</Conditions>
+			<Actions>
+				<Action>cwnd = 1</Action>
+				<Action>rto_timeout = rto_timeout*2</Action>
+				<Action>reset RTO timer</Action>
+				<Action>retransmit last unacked packet</Actions>
+			</Actions>
+			<NextState>ExponentialBackoff</NextState>
+		</Transition>
+		<Transition>
+			<CurrentState>ExponentialBackoff</CurrentState>
+			<Conditions>
+				<Condition>ACK</Condition>
+			</Conditions>
+			<Actions>
+				<Action>Send packet</Action>
+				<Action>reset RTO timer</Action>
+			</Actions>
+			<NextState>SlowStart</NextState>
+		</Transition>
+	</Transitions>
+	<InitialState>SlowStart</InitialState>
+</FSM>
