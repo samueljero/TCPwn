@@ -40,6 +40,7 @@ class tcp_half {
 	unsigned long dup;
 	uint32_t renege_save;
 	uint32_t preack_save;
+	uint32_t limit_save;
 };
 
 class TCPModifier {
@@ -72,6 +73,9 @@ class TCP: public Proto {
 		virtual bool SetPreAck(unsigned long start, unsigned long stop, const char* state, int amt, int method);
 		virtual bool SetRenege(unsigned long start, unsigned long stop, const char* state, int amt, int growth);
 		virtual bool SetBurst(unsigned long start, unsigned long stop, const char* state, int num);
+		virtual bool SetForceAck(unsigned long start, unsigned long stop, const char* state, int dir, int amt);
+		virtual bool SetLimitAck(unsigned long start, unsigned long stop, const char* state);
+		virtual bool SetDrop(unsigned long start, unsigned long stop, const char* state, int p);
 		virtual bool Clear();
 		virtual bool SetPrint(bool on);
 		virtual bool GetDuration(timeval *tm);
@@ -134,6 +138,32 @@ class TCPPreAck: public TCPModifier {
 	private:
 		int preack_amt;
 		int preack_method;
+};
+
+class TCPLimitAck: public TCPModifier {
+	public:
+		TCPLimitAck(unsigned long start, unsigned long stop, int state);
+		virtual ~TCPLimitAck(){}
+		virtual bool shouldApply(unsigned long pktnum, int state);
+		virtual pkt_info apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst);
+		virtual bool Stop() {return true;}
+
+	private:
+		bool active;
+		unsigned long limit;
+};
+
+class TCPDrop: public TCPModifier {
+	public:
+		TCPDrop(unsigned long start, unsigned long stop, int state, int p);
+		virtual ~TCPDrop(){}
+		virtual bool shouldApply(unsigned long pktnum, int state);
+		virtual pkt_info apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst);
+		virtual bool Stop() {return true;}
+
+	private:
+		int p;
+		unsigned int rdata;
 };
 
 class TCPRenege: public TCPModifier {

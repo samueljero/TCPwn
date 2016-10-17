@@ -300,6 +300,41 @@ bool TCP::SetBurst(unsigned long start, unsigned long stop, const char* state, i
 	return true;
 }
 
+bool TCP::SetForceAck(unsigned long start, unsigned long stop, const char* state, int dir, int amt)
+{
+	inject_info info;
+	
+	memset(&info,0,sizeof(inject_info));
+	info.dir = (enum direction)dir;
+	info.method = METHOD_ID_REL;
+	info.freq = 0;
+	info.num = 1;
+	info.ack = amt;
+	info.seq = 0;
+	info.window = 0;
+	if (start == 0) {
+		start = 4;
+	}
+	info.type = TH_ACK;
+	info.start = start;
+	info.stop = stop;
+	info.state = normalize_state(state);
+	return SetInject(start,stop,state,info);
+}
+
+bool TCP::SetLimitAck(unsigned long start, unsigned long stop, const char* state)
+{
+	TCPModifier *m = new TCPLimitAck(start,stop,normalize_state(state));
+	mod1.push_back(m);
+	return true;
+}
+bool TCP::SetDrop(unsigned long start, unsigned long stop, const char* state, int p)
+{
+	TCPModifier *m = new TCPDrop(start,stop,normalize_state(state),p);
+	mod2.push_back(m);
+	return true;
+}
+
 bool TCP::Clear()
 {
 	for (list<TCPModifier*>::iterator it = mod1.begin(); it != mod1.end(); it++) {

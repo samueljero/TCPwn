@@ -376,6 +376,74 @@ void TCPBurst::FinishBurst()
 	return;
 }
 
+TCPLimitAck::TCPLimitAck(unsigned long start, unsigned long stop, int state)
+{
+	this->start = start;
+	this->stop = stop;
+	this->state = state;
+	this->active = false;
+}
+
+bool TCPLimitAck::shouldApply(unsigned long pktnum, int state)
+{
+	bool ret = in_pkt_range(pktnum) && is_state(state);
+	if (!ret) {
+		this->active = false;
+	}
+	return ret;
+}
+
+pkt_info TCPLimitAck::apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst)
+{
+	struct tcphdr *tcph;
+
+	if (dst.port) {} /* Prevent unused warning */
+	if (old_src.port) {} /* Prevent unused warning */
+
+	if (!active) {
+		/* If just becoming active, save high ACK */
+		active = true;
+		src.limit_save = src.high_ack;
+	}
+
+	/* Set ACK */
+	tcph = (struct tcphdr*)hdr.buff;
+	tcph->th_ack = htonl(src.limit_save);
+
+	/* Update Checksum */
+	tcph->th_sum = 0;
+	tcph->th_sum = ipv4_pseudohdr_chksum((u_char*)hdr.buff,hdr.len,(u_char*)pk.ip_dst,(u_char*)pk.ip_src,6);
+	return pk;
+}
+
+TCPDrop::TCPDrop(unsigned long start, unsigned long stop, int state, int p)
+{
+	this->start = start;
+	this->stop = stop;
+	this->state = state;
+	this->p = p;
+	this->rdata = 0;
+}
+
+bool TCPDrop::shouldApply(unsigned long pktnum, int state)
+{
+	return in_pkt_range(pktnum) && is_state(state);
+}
+
+pkt_info TCPDrop::apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old_src, tcp_half &dst)
+{
+	if (dst.port) {} /* Prevent unused warning */
+	if (old_src.port) {} /* Prevent unused warning */
+	if (src.port) {} /* Prevent unused warning */
+	if (hdr.buff) {} /* Prevent unused warning */
+
+	if (rand_r(&rdata) % 100 <= p) {
+		pk = drop(pk);
+	}
+	return pk;
+}
+
+
 TCPInject::TCPInject(unsigned long start, unsigned long stop, int state, inject_info &info)
 {
 	this->start = start;
@@ -459,17 +527,25 @@ void TCPInject::_run()
 	struct timeval tm;
 	int sec;
 	int nsec;
-
-	if (!BuildPacket(pk,msg,info)) {
-		dbgprintf(0, "Error: Failed to build packet!\n");
-		return;
-	}
+	int pkts = 0;
 
 	/* Mutex used only to sleep on */
 	pthread_mutex_lock(&timeout_mutex);
 
+	
 	while(running) {
+		if (!BuildPacket(pk,msg,info)) {
+			dbgprintf(0, "Error: Failed to build packet!\n");
+			return;
+		}
+
 		pk = Attacker::get().fixupAndSend(pk,msg,true);
+		pkts++;
+
+		/* Exit after having sent enough packets */
+		if(info.num > 0 && info.num >= pkts) {
+			break;
+		}
 
 		/* Compute time to send */
 		sec = info.freq / 1000;
@@ -638,18 +714,41 @@ Message TCPInject::BuildIPHeader(Message pk, uint32_t src, uint32_t dst, int nex
 Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info &info, Message &ip_payload, uint32_t ipsrc, uint32_t ipdst)
 {
 	struct tcphdr *tcph;
+	tcp_half *tsrc;
 
 	tcph = (struct tcphdr*)pk.buff;
 	tcph->th_sport = htons(src);
 	tcph->th_dport = htons(dst);
-	tcph->th_seq = htonl(info.seq);
-	tcph->th_ack = htonl(info.ack);
 	tcph->th_x2 = 0;
 	tcph->th_off = 5;
 	tcph->th_flags = info.type;
-	tcph->th_win = htons(info.window);
 	tcph->th_sum = 0;
 	tcph->th_urp = 0;
+
+	switch(info.method) {
+		case METHOD_ID_ABS:
+			tcph->th_seq = htonl(info.seq);
+			tcph->th_ack = htonl(info.ack);
+			tcph->th_win = htons(info.window);
+			break;
+		case METHOD_ID_REL:
+			if (info.dir == FORWARD) {
+				tsrc = fwd;
+			} else {
+				tsrc = rev;
+			}
+			if (!tsrc) {
+				dbgprintf(0, "Error: REL injection with NULL src!\n");
+				return pk;
+			}
+			tcph->th_seq = htonl(tsrc->high_seq + info.seq);
+			tcph->th_ack = htonl(tsrc->high_ack + info.ack);
+			tcph->th_win = htonl(tsrc->window + info.window);
+			break;
+		default:
+			dbgprintf(0, "Error: Invalid Injection method!\n");
+			return pk;
+	}
 
 	tcph->th_sum = ipv4_pseudohdr_chksum((u_char*)pk.buff,sizeof(struct tcphdr),(u_char*)&ipdst,(u_char*)&ipsrc,6);
 

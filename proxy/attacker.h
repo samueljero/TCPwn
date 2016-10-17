@@ -24,9 +24,12 @@
 #define ACTION_ID_PREACK		6
 #define ACTION_ID_RENEGE		7
 #define ACTION_ID_BURST			8
-#define ACTION_ID_PRINT			9
-#define ACTION_ID_CLEAR			10
-#define ACTION_ID_MAX			10
+#define ACTION_ID_FORCEACK		9
+#define ACTION_ID_LIMITACK		10
+#define ACTION_ID_DROP			11
+#define ACTION_ID_PRINT			12
+#define ACTION_ID_CLEAR			13
+#define ACTION_ID_MAX			13
 
 #define PROTO_ID_ERR (-1)
 #define PROTO_ID_MIN 0
@@ -36,7 +39,8 @@
 #define METHOD_ID_ERR (-1)
 #define METHOD_ID_MIN 0
 #define METHOD_ID_ABS 0
-#define METHOD_ID_MAX 0
+#define METHOD_ID_REL 1
+#define METHOD_ID_MAX 1
 
 
 class Attacker{

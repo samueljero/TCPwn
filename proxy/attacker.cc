@@ -38,12 +38,16 @@ using namespace std;
 #define ACTION_ALIAS_PREACK		"PREACK"
 #define ACTION_ALIAS_RENEGE		"RENEGE"
 #define ACTION_ALIAS_BURST		"BURST"
+#define ACTION_ALIAS_FORCEACK	"FORCEACK"
+#define ACTION_ALIAS_LIMITACK	"LIMITACK"
+#define ACTION_ALIAS_DROP		"DROP"
 #define ACTION_ALIAS_PRINT		"PRINT"
 #define ACTION_ALIAS_CLEAR		"CLEAR"
 
 #define PROTO_ALIAS_TCP			"TCP"
 
 #define METHOD_ALIAS_ABS		"ABS"
+#define METHOD_ALIAS_REL		"REL"
 
 #define IP_WILDCARD 0
 
@@ -59,6 +63,7 @@ Attacker::Attacker()
 	pthread_rwlock_init(&lock, NULL);
 	pthread_mutex_init(&time_lock, NULL);
 	gettimeofday(&last_pkt, NULL);
+	srand(time(NULL));
 }
 Attacker::~Attacker()
 {
@@ -86,6 +91,7 @@ bool Attacker::addCommand(Message m, Message *resp)
 	Proto *obj;
 	arg_node_t *targ;
 	int amt;
+	int tmp;
 	inject_info info;
 	char *state;
 
@@ -318,6 +324,43 @@ bool Attacker::addCommand(Message m, Message *resp)
 				ret = false;
 			}
 			break;
+		case ACTION_ID_FORCEACK:
+			tmp = FORWARD;
+			targ = args_find(args, "dir");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				if (targ->value.i == 1) {
+					tmp = FORWARD;
+				} else if (targ->value.i == 2) {
+					tmp = BACKWARD;
+				} else {
+					dbgprintf(0, "Adding FORCEACK Command: failed with bad arguments---invalid direction\n");
+				}
+			} else {
+					dbgprintf(0, "Adding FORCEACK Command: failed with bad arguments---invalid direction\n");
+					ret = false;
+					goto unlock;
+			}
+
+			targ = args_find(args,"amt");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				ret = obj->SetForceAck(start,stop,state,tmp,targ->value.i);
+			} else {
+				dbgprintf(0, "Adding FORCEACK Command: failed with bad arguments (missing amt tag)\n");
+				ret = false;
+			}
+			break;
+		case ACTION_ID_LIMITACK:
+			ret = obj->SetLimitAck(start,stop,state);
+			break;
+		case ACTION_ID_DROP:
+			targ = args_find(args,"p");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				ret = obj->SetDrop(start,stop,state,targ->value.i);
+			} else {
+				dbgprintf(0, "Adding DROP Command: failed with bad arguments (missing p tag)\n");
+				ret = false;
+			}
+			break;
 		case ACTION_ID_PRINT:
 			targ = args_find(args, "on");
 			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
@@ -462,6 +505,9 @@ int Attacker::normalize_action_type(char *s)
 	if (!strcmp(ACTION_ALIAS_PREACK,s)) return ACTION_ID_PREACK;
 	if (!strcmp(ACTION_ALIAS_RENEGE,s)) return ACTION_ID_RENEGE;
 	if (!strcmp(ACTION_ALIAS_BURST,s)) return ACTION_ID_BURST;
+	if (!strcmp(ACTION_ALIAS_FORCEACK,s)) return ACTION_ID_FORCEACK;
+	if (!strcmp(ACTION_ALIAS_LIMITACK,s)) return ACTION_ID_LIMITACK;
+	if (!strcmp(ACTION_ALIAS_DROP,s)) return ACTION_ID_DROP;
 	if (!strcmp(ACTION_ALIAS_PRINT,s)) return ACTION_ID_PRINT;
 	if (!strcmp(ACTION_ALIAS_CLEAR,s)) return ACTION_ID_CLEAR;
 	return ACTION_ID_ERR;
@@ -490,6 +536,7 @@ int Attacker::normalize_method(char *s)
 	}
 
 	if (!strcmp(METHOD_ALIAS_ABS,s)) return METHOD_ID_ABS;
+	if (!strcmp(METHOD_ALIAS_REL,s)) return METHOD_ID_REL;
 	return METHOD_ID_ERR;
 }
 

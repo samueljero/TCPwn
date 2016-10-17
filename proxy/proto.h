@@ -23,6 +23,7 @@ class inject_info {
 	unsigned long seq;
 	unsigned long ack;
 	int freq;
+	int num;
 	int method;
 	enum direction dir;
 	unsigned long start;
@@ -42,6 +43,9 @@ class Proto {
 		virtual bool SetPreAck(unsigned long start, unsigned long stop, const char* state, int amt, int method) = 0;
 		virtual bool SetRenege(unsigned long start, unsigned long stop, const char* state, int amt, int growth) = 0;
 		virtual bool SetBurst(unsigned long start, unsigned long stop, const char* state, int num) = 0;
+		virtual bool SetForceAck(unsigned long start, unsigned long stop, const char* state, int dir, int amt) = 0;
+		virtual bool SetLimitAck(unsigned long start, unsigned long stop, const char* state) = 0;
+		virtual bool SetDrop(unsigned long start, unsigned long stop, const char* state, int p) = 0;
 		virtual bool Clear() = 0;
 		virtual bool SetPrint(bool on) = 0;
 		virtual bool GetDuration(timeval *tm) = 0;
