@@ -1,4 +1,5 @@
 # Samuel Jero <sjero@purdue.edu>
+# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 # CC Testing Strategy Generation
 # Strategy Generation Class with abstract build_strategies() and strategy_feedback()
 import os
@@ -61,8 +62,9 @@ class StrategyGenerator:
                 self.failed_lst.append(strat)
             else:
                 # Final failure, record in result file
-                lst = ["FAILED", str(datetime.today()), strat, reason, feedback['capture'], feedback['last']]
-                self.results.write("%s\n" % (str(lst)))
+                lst = ["FAILED", str(datetime.today()), strat, reason, feedback['capture'], feedback['last'], feedback['bytes']]
+                dct = {'result':'FAILED', 'date':str(datetime.today()), 'strat':strat, 'reason':reason, 'capture':feedback['capture'], 'time':feedback['last'], 'bytes':feedback['bytes']}
+                self.results.write("%s\n" % (str(dct)))
                 self.results.flush()
                 self.lg.write("[%s] Strategy HARD FAILED: %s\n" % (str(datetime.today()), str(strat)))
                 print "[%s] Strategy HARD FAILED: %s" % (str(datetime.today()), str(strat))

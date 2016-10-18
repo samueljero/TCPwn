@@ -1,4 +1,5 @@
 # Samuel Jero <sjero@purdue.edu>
+# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 # CC Testing Strategy Generation
 # Simple Brute Force and From File algorithms
 from strategyGenerator import StrategyGenerator
@@ -6,6 +7,7 @@ import os
 import sys
 from datetime import datetime
 import manipulations
+from stateMapper import StateMapper
 
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 config_path = os.path.abspath(os.path.join(system_home, 'config'))
@@ -69,7 +71,7 @@ class BruteForce(StrategyGenerator):
 class FromFile(StrategyGenerator):
     # Constructor
     def __init__(self, lg, res_lg, f):
-            StrategyGenerator.__init(self, lg, res_lg)
+            StrategyGenerator.__init__(self, lg, res_lg)
             self.stratFile = f
 
     def build_strategies(self):
@@ -88,3 +90,18 @@ class FromFile(StrategyGenerator):
             self.lg.write("[%s] Strategies: %d\n" % (str(datetime.today()), len(self.strat_lst)))
             print "[%s] Strategies: %d" % (str(datetime.today()), len(self.strat_lst))
 
+
+class StateBased(StrategyGenerator):
+    # Constructor
+    def __init__(self, lg, res_lg):
+        StrategyGenerator.__init__(self,lg,res_lg)
+        self.sm = StateMapper(lg, config.coord_strategy_generation_state_machine_file,
+                    config.coord_strategy_generation_state_machine_search)
+
+    def build_strategies(self):
+        strategies = self.sm.createStrategies()
+        for s in strategies:
+            d = {'strat':s, 'priority':0, 'retries':0}
+            self.strat_lst.append(d)
+        self.lg.write("[%s] Strategies: %d\n" % (str(datetime.today()), len(self.strat_lst)))
+        print "[%s] Strategies: %d" % (str(datetime.today()), len(self.strat_lst))

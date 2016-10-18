@@ -1,4 +1,5 @@
 #Samuel Jero <sjero@purdue.edu>
+# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 #Congestion Control Manipulations
 #These numbers are based on a test connection that transfers 10-11k packets
 

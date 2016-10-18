@@ -1,4 +1,5 @@
 #!/bin/env python
+# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 # Samuel Jero <sjero@purdue.edu>
 # Testing Coordinator
 #
@@ -16,8 +17,7 @@ from datetime import datetime
 import SocketServer as ss
 import argparse
 import threading
-from simpleGenerators import BruteForce, FromFile
-from stateBased import StateBased
+from generators import BruteForce, FromFile, StateBased
 
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 config_path = os.path.abspath(os.path.join(system_home, 'config'))
@@ -226,7 +226,7 @@ def main(args):
         mode = "a"
     else:
         mode = "w"
-    if args['load'] == True:
+    if len(args['load']) > 0:
         args['algorithm'] = "FromFile"
     print "Starting Coordinator..."
 
@@ -247,7 +247,7 @@ def main(args):
         f = open(args['load'], "r")
         strat_gen = FromFile(lg, res_lg, f)
     elif args['algorithm'] == "StateBased":
-	strat_gen = StateBased(lg, res_lg)
+        strat_gen = StateBased(lg, res_lg)
     else:
         print "Error: Unknown Strategy Generation Algorithm %s" % args['algorithm']
         return

@@ -311,7 +311,7 @@ bool TCP::SetForceAck(unsigned long start, unsigned long stop, const char* state
 	info.num = 1;
 	info.ack = amt;
 	info.seq = 0;
-	info.window = 0;
+	info.window = 10000;
 	if (start == 0) {
 		start = 4;
 	}

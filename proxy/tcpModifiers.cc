@@ -733,9 +733,9 @@ Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject
 			break;
 		case METHOD_ID_REL:
 			if (info.dir == FORWARD) {
-				tsrc = fwd;
-			} else {
 				tsrc = rev;
+			} else {
+				tsrc = fwd;
 			}
 			if (!tsrc) {
 				dbgprintf(0, "Error: REL injection with NULL src!\n");

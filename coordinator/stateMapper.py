@@ -22,23 +22,23 @@ class StateMapper():
                         "FastRecovery":"STATE_FAST_RECOV", "ExponentialBackoff":"STATE_RTO"}
     actionMap = {
         #Send current ACK. Also just wait for protocol
-        "ACK":[{'action':'FORCEACK','param':'amt=10,dir=1'},{'action':'FORCEACK','param':'amt=10,dir=2'},{}],
+        "ACK":[{'action':'FORCEACK','param':'amt=10&dir=1'},{'action':'FORCEACK','param':'amt=10&dir=2'},{}],
         #DUP Acks implemented with DUP action
         "ACK && dup":[{'action':'DUP','param':'num=100'},{'action':'DUP','param':'num=4'},{'action':'LIMITACK','param':'*'},{}],
         "ACK && dup && dupACKctr < 2":[{'action':'DUP','param':'num=1'}],
         "ACK && dup && dupACKctr+1 == 3":[{'action':'DUP','param':'num=4'},{'action':'LIMITACK','param':'*'}],
         #Send current ACK. Also just wait for protocol
-        "ACK && new":[{'action':'FORCEACK','param':'amt=10,dir=1'},{'action':'FORCEACK','param':'amt=10,dir=2'},{}],
+        "ACK && new":[{'action':'FORCEACK','param':'amt=10&dir=1'},{'action':'FORCEACK','param':'amt=10&dir=2'},{}],
         #PREACK may help speed up exiting slow start. Maybe force loss to set ssthresh?
         "ACK && new && cwnd + MSS >= ssthresh":[{'action':'PREACK','param':'method=3&amt=1'},{}],
         #Nothing really to do. Force sending an ACK might help.
-        "ACK && new && cwnd+MSS < ssthresh":[{'action':'FORCEACK','param':'amt=10,dir=1'},{'action':'FORCEACK','param':'amt=10,dir=2'},{}],
+        "ACK && new && cwnd+MSS < ssthresh":[{'action':'FORCEACK','param':'amt=10&dir=1'},{'action':'FORCEACK','param':'amt=10&dir=2'},{}],
         #Use DIV ACKs to keep below high_water as long as possible
         "ACK && new && pkt.ack < high_water":[{'action':'DIV', 'param':'bpc=100'}],
         #PREACK may help speed up reaching high_water, but nothing we do can directly achieve this
         "ACK && new && pkt.ack >= high_water":[{'action':'PREACK','param':'method=3&amt=1'},{}],
         #BURST interrupts timing, making RTO likely. Also DROP packets
-        "RTO Timeout":[{'action':'BURST','param':'num=10'},{'action':'DROP','param':'p=80'},{'action':'LIMITACK':'param':'*'}],
+        "RTO Timeout":[{'action':'BURST','param':'num=10'},{'action':'DROP','param':'p=80'},{'action':'LIMITACK','param':'*'}],
     }
 
     def __init__(self, lg, statemachinefile, searchterm):

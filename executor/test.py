@@ -1,4 +1,5 @@
 # Samuel Jero <sjero@purdue.edu>
+# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 # Actual strategy test routines
 import manage_vms as mv
 import os
@@ -41,6 +42,7 @@ class CCTester:
         self.result_low_threshold = 0
         self.last_result = 0
         self.last_transfer = 0
+        self.last_termination_idle = False
         self.do_capture = config.do_capture
         self.last_cap = ""
         self.monitor_running = False
@@ -90,7 +92,7 @@ class CCTester:
     def doTest(self, strategy):
         """
         :return [True | False, str]: First boolean value indicates pass or fail,
-        	followed by an explanation
+                followed by an explanation
         """
         self.last_result = 0
         result = [True, "Success!"]
@@ -146,17 +148,17 @@ class CCTester:
         self.log.write("Data Transfered " + str(res[2]) + "\n")
         self.last_result = res[1]
         self.last_transfer = res[2]
-        if self.result_low_threshold > 0 and self.result_high_threshold > 0:
-            if self.last_result < self.result_low_threshold:
-                if self.last_transfer < (config.transfer_size * config.transfer_multiple):
-                    result[0] = False
-                    result[1] = "Stalled Connection"
-                else:
+        if self.last_transfer < (config.transfer_size * config.transfer_multiple) and self.last_termination_idle and self.last_result < config.max_time*0.9:
+            result[0] = False
+            result[1] = "Stalled Connection"
+        else:
+            if self.result_low_threshold > 0 and self.result_high_threshold > 0:
+                if self.last_result < self.result_low_threshold:
                     result[0] = False
                     result[1] = "Performance -- Faster"
-            if self.last_result > self.result_high_threshold:
-                result[0] = False
-                result[1] = "Performance -- Slower"
+                if self.last_result > self.result_high_threshold:
+                    result[0] = False
+                    result[1] = "Performance -- Slower"
 
         # Stop Monitor
         if not self._stop_monitor(monitor):
@@ -359,12 +361,14 @@ class CCTester:
             return False, 0
 
         #Wait to finish
+        self.last_termination_idle = False
         while background.is_running() or main.is_running():
             if background.is_running():
                 bspeed = time.time() - bts
             if main.is_running():
                 speed = time.time()  - mts
             if self._query_proxy_done():
+                self.last_termination_idle = True
                 try:
                     background.send_signal(2)
                 except Exception as e:
