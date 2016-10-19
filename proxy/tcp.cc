@@ -182,6 +182,8 @@ void TCP::init_conn_info(pkt_info pk, struct tcphdr *tcph, tcp_half &src, tcp_ha
 
 void TCP::update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src)
 {
+	int len;
+
 	/* Handle ISNs */
 	if (!src.have_initial_seq) {
 		src.initial_seq = ntohl(tcph->th_seq);
@@ -197,7 +199,11 @@ void TCP::update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src)
 	/* Update sequence and ack numbers */
 	//TODO: How do we handle SACK?
 	if (src.have_initial_seq && SEQ_AFTERQ(ntohl(tcph->th_seq),src.high_seq) && !(tcph->th_flags & TH_SYN)) {
-		src.high_seq = ntohl(tcph->th_seq) + (hdr.len - tcph->th_off*4)-1;
+		len = hdr.len - tcph->th_off*4;
+		if (len > 0) {
+			len--;
+		}
+		src.high_seq = ntohl(tcph->th_seq) + len;
 	}
 	if (src.have_initial_ack && (tcph->th_flags & TH_ACK) && SEQ_AFTERQ(ntohl(tcph->th_ack),src.high_ack)) {
 		src.high_ack = ntohl(tcph->th_ack);
@@ -311,7 +317,7 @@ bool TCP::SetForceAck(unsigned long start, unsigned long stop, const char* state
 	info.num = 1;
 	info.ack = amt;
 	info.seq = 0;
-	info.window = 10000;
+	info.window = 0;
 	if (start == 0) {
 		start = 4;
 	}
