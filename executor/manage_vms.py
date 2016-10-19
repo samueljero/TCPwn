@@ -1,6 +1,12 @@
 #!/bin/env python
 # Samuel Jero <sjero@purdue.edu>
 # Script for starting/stopping/suspending/resuming VMs
+# Full qemu cmd line:
+# qemu-system-x86_64 -hda <disk> -m 2G -smp 2 -enable-kvm -k "en-us" -net nic,model=virtio,macaddr=00:00:00:01:00:01,vlan=0 -net tap,ifname=tap-n0-h1,downscript=no,script=no,vlan=0 -net user,vlan=1 -net nic,vlan=1 -monitor telnet:127.0.0.1:1101 -vnc 127.0.0.1:1
+# Simple qemu cmd line:
+# qemu-system-x86_64 -hda <disk> -m 2G -smp 2 -enable-kvm -k "en-us" -net user,vlan=1 -net nic,vlan=1 -monitor telnet:127.0.0.1:1101
+# Qemu Img cmd line:
+# qemu-img -b <backingfile> -o compat=0.10 -F qcow2 -f qcow2 <file>
 import os
 import sys
 import socket
