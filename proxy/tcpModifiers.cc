@@ -743,7 +743,7 @@ Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject
 			}
 			tcph->th_seq = htonl(tsrc->high_seq + info.seq);
 			tcph->th_ack = htonl(tsrc->high_ack + info.ack);
-			tcph->th_win = htonl(tsrc->window + info.window);
+			tcph->th_win = htons(tsrc->window + info.window);
 			break;
 		default:
 			dbgprintf(0, "Error: Invalid Injection method!\n");
