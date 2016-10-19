@@ -65,6 +65,12 @@ class CCTester:
                 continue
             else:
                 perf_measurements.append(self.last_result)
+            avg  = sum(perf_measurements)/len(perf_measurements)
+            stddev = numpy.std(perf_measurements)
+            print "Preliminary Average: " + str(avg)
+            print "Preliminary Standard Deviation: " + str(stddev)
+            self.log.write("Preliminary Average: " + str(avg) + "\n")
+            self.log.write("Preliminary Standard Deviation: " + str(stddev) + "\n")
             i += 1
         
         self.testnum = num
@@ -73,6 +79,10 @@ class CCTester:
         #Compute threshold
         avg  = sum(perf_measurements)/len(perf_measurements)
         stddev = numpy.std(perf_measurements)
+        if hasattr(config,"test_results_avg"):
+            avg = config.test_results_avg
+        if hasattr(config, "test_results_stddev"):
+            stddev = config.test_results_stddev
         self.result_high_threshold = avg + 2*stddev
         self.result_low_threshold = avg - 2*stddev
 
