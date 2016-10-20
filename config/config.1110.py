@@ -45,7 +45,7 @@ background_client_ip = "10.0.3.2"
 #Coordinator
 coordinator_port = 3333
 failed_retries = 1
-coord_strategy_generation_algorithm = "BruteForce"
+coord_strategy_generation_algorithm = "StateBased"
 coord_strategy_generation_state_machine_file = system_home + "/config/tcp-newreno.xml"
 coord_strategy_generation_state_machine_search = "cwnd"
 coord_checkpoint_file = system_home + "/logs/coord.ck"
@@ -60,6 +60,8 @@ max_time = 60
 transfer_size = 100*1024*1024
 transfer_multiple = 0.7
 test_max_idle = 10
+#test_results_avg =
+#test_results_stddev =
 
 #VM Section
 vm_path = system_home + "/vms/"
