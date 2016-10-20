@@ -69,6 +69,7 @@ master_name = "/ubuntu-1404-master.qcow2"
 vm_name_bases = ["client", "client","ubuntu1110-server","server", "tc", "track"]
 vm_net = [["tap-n{n}-b1-h0"],["tap-n{n}-b1-h1"],["tap-n{n}-b3-h0"],["tap-n{n}-b2-h1"],["tap-n{n}-b1-h2","tap-n{n}-b2-h2"], ["tap-n{n}-b3-h1","tap-n{n}-b2-h0"]]
 vm_has_ssh = [True,True,True,True,True,True]
+vm_can_ping = [True,True,True,True,True,True]
 vm_cores =  ["2","2","2","2","4","2"]
 vm_user = "root"
 vm_ip_base = "10.0.1.{0}"

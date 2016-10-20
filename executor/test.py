@@ -210,9 +210,12 @@ class CCTester:
                 print "Error: client VM %d not started!" % (c)
                 return False
         for s in self.servers:
-            if(self._waitListening(mv.vm2ip(s), 22 if mv.vmHasSSH(s) else 80, 240, True) == False):
-                print "Error: server VM %d not started!" % (s)
-                return False
+            if not mv.vmCanPing(s):
+                time.sleep(30)
+            else:
+                if(self._waitListening(mv.vm2ip(s), 22 if mv.vmHasSSH(s) else 80, 240, True) == False):
+                    print "Error: server VM %d not started!" % (s)
+                    return False
         for t in self.tc:
             if(self._waitListening(mv.vm2ip(t), 22, 240, True) == False):
                 print "Error: Traffic Shaping VM %d not started!" % (t)
@@ -333,7 +336,7 @@ class CCTester:
                     print "Failed to start server"
                     self.log.write("Failed to start server\n")
                     return False,0
-            if(self._waitListening(mv.vm2ip(s),80, 240, False) == False):
+            if  mv.vmCanPing(s) and self._waitListening(mv.vm2ip(s),80, 240, False) == False:
                 print "Failed to start server"
                 self.log.write("Failed to start server\n")
                 return False,0

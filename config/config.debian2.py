@@ -6,7 +6,7 @@ import socket
 #Global
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 logs_loc = system_home + "/logs/inst{instance}.log"
-currently_testing = "Windows 95"
+currently_testing = "Debian 2.0"
 protocol = "TCP"
 
 #Captures
@@ -56,20 +56,20 @@ dst_email_address = "samuel.jero@gmail.com"
 src_email_address = "cctester@" + socket.getfqdn()
 
 #Test
-max_time = 120
+max_time = 60
 transfer_size = 10*1024*1024
-transfer_multiple = 0.8
+transfer_multiple = 0.7
 test_max_idle = 10
 #test_results_avg =
 #test_results_stddev =
 
 #VM Section
 vm_path = system_home + "/vms/"
-master_name = "/ubuntu-1404-master.qcow2"
-vm_name_bases = ["client", "client","windows95-server","server", "tc", "track"]
+master_name = "/debian2-master.qcow2"
+vm_name_bases = ["client", "client","debian2-server","server", "tc", "track"]
 vm_net = [["tap-n{n}-b1-h0"],["tap-n{n}-b1-h1"],["tap-n{n}-b3-h0"],["tap-n{n}-b2-h1"],["tap-n{n}-b1-h2","tap-n{n}-b2-h2"], ["tap-n{n}-b3-h1","tap-n{n}-b2-h0"]]
 vm_has_ssh = [True,True,False,True,True,True]
-vm_can_ping = [True,True,True,True,True,True]
+vm_can_ping = [True,True,False,True,True,True]
 vm_cores =  ["2","2","1","1","4","2"]
 vm_user = "root"
 vm_ip_base = "10.0.1.{0}"
