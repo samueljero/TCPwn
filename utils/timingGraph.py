@@ -1,4 +1,5 @@
 #!/bin/env python
+# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
 # Samuel Jero <sjero@purdue.edu>
 # Timing Graph Generator
 import sys
@@ -38,33 +39,35 @@ def which(program):
     return None
 
 def main(args):
-	global term_type
+        global term_type
 
-	#Parse Args
-	argp = argparse.ArgumentParser(description='Timing Graph Generator')
-	argp.add_argument('log_file', help="Input Logfile")
-	argp.add_argument('out_file', help="Output File")
-	args = vars(argp.parse_args(args[1:]))
+        #Parse Args
+        argp = argparse.ArgumentParser(description='Timing Graph Generator')
+        argp.add_argument('log_file', help="Input Logfile")
+        argp.add_argument('out_file', help="Output File")
+        args = vars(argp.parse_args(args[1:]))
 
-	
-	#Open log file
-	logfile = None
-	try:	
-		logfile = open(args['log_file'],"r")
-	except Exception as e:
-		print "Error: could not open " + args['log_file']
-		sys.exit(1)
+        
+        #Open log file
+        logfile = None
+        try:    
+                logfile = open(args['log_file'],"r")
+        except Exception as e:
+                print "Error: could not open " + args['log_file']
+                sys.exit(1)
 
-	#Open Output File
-	try:
-		outfile = open(args['out_file'], "w")
-	except Exception as e:
-		print "Error: could not open output file"
-		sys.exit(1)
+        #Open Output File
+        try:
+                outfile = open(args['out_file'], "w")
+        except Exception as e:
+                print "Error: could not open output file"
+                sys.exit(1)
 
-	# Read Results file
+        # Read Results file
         thresholds = False
         name = ""
+        perf = 0
+        byte = 0
         for line in logfile:
             if line.find("Strategy CMD:") >= 0:
                 parts = line.split(":")
@@ -76,8 +79,12 @@ def main(args):
                 name += nm
             elif line.find("Performance:") >= 0:
                 parts = line.split(":")
+                perf = float(parts[1].strip())
+            elif line.find("Bytes") >= 0:
+                parts = line.split(":")
+                byte = int(parts[1].strip())
                 if len(name) > 0:
-                    outfile.write("%s\t%s\n" %(name, str(float(parts[1].strip()))))
+                    outfile.write("%s\t%s\t%s\n" %(name, str(perf),str(byte)))
                     #print name, float(parts[1].strip())
                     name = ""
             elif line.find("################") >= 0:
@@ -89,9 +96,9 @@ def main(args):
             
 
         logfile.close()
-	outfile.close()
-	return 0
+        outfile.close()
+        return 0
 
 
 if __name__ == "__main__":
-	main(sys.argv)
+        main(sys.argv)
