@@ -115,12 +115,12 @@ class CCTester:
         # Start Proxy
         proxy = self._start_proxy()
         if proxy is None:
-            self._stop_monitor(monitor)
             return (False, "System Failure")
 
         #Start monitor
         monitor = self._start_monitor()
         if monitor is None:
+            self._stop_proxy(proxy)
             return (False, "System Failure")
 
         # Send Proxy Strategy
