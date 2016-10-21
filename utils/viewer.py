@@ -208,14 +208,10 @@ def handle_strat(result, ln_no, executor_files, capture_directory, out):
                 prior_categorize_choice = "yes"
                 cat = raw_input("Category: ").strip().upper()
                 details = raw_input("Details: ").strip()
-                info = []
-                info.append(cat)
-                info.append(result[1])
-                info.append(result[2])
-                info.append(result[3])
-                info.append(split(cap)[1])
-                info.append(details)
-                out.write(repr(info))
+                result['category'] = cat
+                result['details'] = details
+                result['capture'] = split(cap)[1]
+                out.write(repr(result)+"\n")
                 out.flush()
         else:
                 prior_categorize_choice = "no"
