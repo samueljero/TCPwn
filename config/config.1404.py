@@ -33,6 +33,7 @@ monitor_kill_cmd = "pkill monitor"
 
 #Servers
 server_start_cmd = "service apache2 restart"
+background_server_config = ""
 target_server_ip = "10.0.3.3"
 background_server_ip = "10.0.3.4"
 

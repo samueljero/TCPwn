@@ -216,6 +216,15 @@ class CCTester:
                 if(self._waitListening(mv.vm2ip(s), 22 if mv.vmHasSSH(s) else 80, 240, True) == False):
                     print "Error: server VM %d not started!" % (s)
                     return False
+
+        if hasattr(config,'background_server_config') and len(config.background_server_config) > 0 and mv.vmHasSSH(self.servers[1]):
+            shell = spur.SshShell(hostname=mv.vm2ip(self.servers[1]), username=config.vm_user,
+                                  missing_host_key=spur.ssh.MissingHostKey.accept, private_key_file=config.vm_ssh_key)
+            proc = shell.run(["/bin/bash", "-i", "-c", config.background_server_config])
+            if proc.return_code is not 0:
+                print "Error: Background server config failed!"
+                return False
+
         for t in self.tc:
             if(self._waitListening(mv.vm2ip(t), 22, 240, True) == False):
                 print "Error: Traffic Shaping VM %d not started!" % (t)

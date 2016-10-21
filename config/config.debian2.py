@@ -33,6 +33,7 @@ monitor_kill_cmd = "pkill monitor"
 
 #Servers
 server_start_cmd = "service apache2 restart"
+background_server_config = "echo reno > /proc/sys/net/ipv4/tcp_congestion_control; echo 0 > /proc/sys/net/ipv4/tcp_sack; echo 0 > /proc/sys/net/ipv4/tcp_timestamps"
 target_server_ip = "10.0.3.3"
 background_server_ip = "10.0.3.4"
 
@@ -56,7 +57,7 @@ dst_email_address = "samuel.jero@gmail.com"
 src_email_address = "cctester@" + socket.getfqdn()
 
 #Test
-max_time = 60
+max_time = 90
 transfer_size = 10*1024*1024
 transfer_multiple = 0.7
 test_max_idle = 10
