@@ -46,6 +46,18 @@ def startvm(num):
             cpus = config.vm_cores[(num-1)%len(config.vm_cores)]
             telnet= config.vm_telnet_base + num
             os.system("qemu-system-i386 -hda {0} -m {1} -M pc -no-kvm {3} {4} -monitor telnet:127.0.0.1:{5},server,nowait &".format(img,config.vm_ram,cpus,nics, vnc,str(telnet)))
+        elif config.vm_name_bases[(num-1)%len(config.vm_name_bases)] == "windows-8.1-server":
+            nics = ""
+            nics += " -net nic,model=e1000,macaddr=00:00:00:01:00:{:02X},vlan=0 -net tap,ifname=tap-n{}-h{:d},downscript=no,script=no,vlan=0 ".format(num,net,host)
+            nics += " -net user,vlan=1 -net nic,model=e1000,vlan=1 "
+            nets = config.vm_net[(num-1)%len(config.vm_net)]
+            for i in range(0,len(nets)):
+                tap = nets[i].format(n=net)
+                nics += " -net nic,model=e1000,macaddr=00:00:00:01:{:02X}:{:02X},vlan={} -net tap,ifname={},downscript=no,script=no,vlan={} ".format(i+1,num,i+2,tap,i+2)
+            vnc="-vnc 127.0.0.1:{0}".format(str(config.vm_vnc_base + num))
+            cpus = config.vm_cores[(num-1)%len(config.vm_cores)]
+            telnet= config.vm_telnet_base + num
+            os.system("qemu-system-x86_64 -hda {0} -m {1} -smp {2} -enable-kvm -k \"en-us\" {3} {4} -monitor telnet:127.0.0.1:{5},server,nowait &".format(img,config.vm_ram,cpus,nics, vnc,str(telnet)))
         else:
             nics = ""
             nics += " -net nic,model=virtio,macaddr=00:00:00:01:00:{:02X},vlan=0 -net tap,ifname=tap-n{}-h{:d},downscript=no,script=no,vlan=0 ".format(num,net,host)
