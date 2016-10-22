@@ -105,6 +105,7 @@ class CCTester:
                 followed by an explanation
         """
         self.last_result = 0
+        self.last_transfer = 0
         result = [True, "Success!"]
         self.log.write('#' * 30 + "Starting Test " + str(self.testnum) + '#' * 30 + '\n')
         self.log.write(str(datetime.today()) + "\n")
@@ -158,6 +159,10 @@ class CCTester:
         self.log.write("Data Transfered " + str(res[2]) + "\n")
         self.last_result = res[1]
         self.last_transfer = res[2]
+        if self.last_transfer == 0:
+            self._stop_proxy(proxy)
+            self._stop_monitor(monitor)
+            return (False, "System Failure")
         if self.last_transfer < (config.transfer_size * config.transfer_multiple) and self.last_termination_idle and self.last_result < config.max_time*0.9:
             result[0] = False
             result[1] = "Stalled Connection"
@@ -172,6 +177,7 @@ class CCTester:
 
         # Stop Monitor
         if not self._stop_monitor(monitor):
+            self._stop_proxy(proxy)
             return (False, "System Failure")
 
         # Stop Proxy
