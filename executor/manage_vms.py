@@ -46,7 +46,7 @@ def startvm(num):
             cpus = config.vm_cores[(num-1)%len(config.vm_cores)]
             telnet= config.vm_telnet_base + num
             os.system("qemu-system-i386 -hda {0} -m {1} -M pc -no-kvm {3} {4} -monitor telnet:127.0.0.1:{5},server,nowait &".format(img,config.vm_ram,cpus,nics, vnc,str(telnet)))
-        elif config.vm_name_bases[(num-1)%len(config.vm_name_bases)] == "windows-8.1-server":
+        elif config.vm_name_bases[(num-1)%len(config.vm_name_bases)] == "windows-8.1-server" or config.vm_name_bases[(num-1)%len(config.vm_name_bases)] == "windowsXP-server":
             nics = ""
             nics += " -net nic,model=e1000,macaddr=00:00:00:01:00:{:02X},vlan=0 -net tap,ifname=tap-n{}-h{:d},downscript=no,script=no,vlan=0 ".format(num,net,host)
             nics += " -net user,vlan=1 -net nic,model=e1000,vlan=1 "
