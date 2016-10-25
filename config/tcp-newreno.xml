@@ -19,7 +19,7 @@
 				<Action>cwnd = cwnd + MSS</Action>
 				<Action>If new RTT sample, update rto_timeout</Action>
 				<Action>reset RTO timer</Action>
-				<Action>send packets</Actions>
+				<Action>send packets</Action>
 			</Actions>
 			<NextState>CongestionAvoidance</NextState>
 		</Transition>
@@ -35,7 +35,7 @@
 				<Action>ssthresh = cwnd/2</Action>
 				<Action>high_water = last packet sent</Action>
 				<Action>reset RTO timer</Action>
-				<Action>retransmit last unacked packet</Actions>
+				<Action>retransmit last unacked packet</Action>
 			</Actions>
 			<NextState>FastRecovery</NextState>
 		</Transition>
@@ -49,7 +49,7 @@
 				<Action>cwnd = 1</Action>
 				<Action>rto_timeout = rto_timeout*2</Action>
 				<Action>reset RTO timer</Action>
-				<Action>retransmit last unacked packet</Actions>
+				<Action>retransmit last unacked packet</Action>
 			</Actions>
 			<NextState>ExponentialBackoff</NextState>
 		</Transition>
@@ -78,7 +78,7 @@
 				<Action>cwnd = cwnd + MSS</Action>
 				<Action>If new RTT sample, update rto_timeout</Action>
 				<Action>reset RTO timer</Action>
-				<Action>Send packets</Actions>
+				<Action>Send packets</Action>
 			</Actions>
 			<NextState>SlowStart</NextState>
 		</Transition>
@@ -106,7 +106,7 @@
 				<Action>cwnd = cwnd + MSS*(MMS/cwnd)</Action>
 				<Action>If new RTT sample, update rto_timeout</Action>
 				<Action>reset RTO timer</Action>
-				<Action>Send packets</Actions>
+				<Action>Send packets</Action>
 			</Actions>
 			<NextState>CongestionAvoidance</NextState>
 		</Transition>
@@ -122,7 +122,7 @@
 				<Action>ssthresh = cwnd/2</Action>
 				<Action>high_water = last packet sent</Action>
 				<Action>reset RTO timer</Action>
-				<Action>retransmit last unacked packet</Actions>
+				<Action>retransmit last unacked packet</Action>
 			</Actions>
 			<NextState>FastRecovery</NextState>
 		</Transition>
@@ -136,7 +136,7 @@
 				<Action>cwnd = 1</Action>
 				<Action>rto_timeout = rto_timeout*2</Action>
 				<Action>reset RTO timer</Action>
-				<Action>retransmit last unacked packet</Actions>
+				<Action>retransmit last unacked packet</Action>
 			</Actions>
 			<NextState>ExponentialBackoff</NextState>
 		</Transition>
@@ -150,8 +150,8 @@
 			<Actions>
 				<Action>cwnd = cwnd - data acknowledged</Action>
 				<Action>reset RTO timer</Action>
-				<Action>retransmit last unacked packet</Actions>
-				<Action>Send packets</Actions>
+				<Action>retransmit last unacked packet</Action>
+				<Action>Send packets</Action>
 			</Actions>
 			<NextState>FastRecovery</NextState>
 		</Transition>
@@ -164,7 +164,7 @@
 			<Actions>
 				<Action>cwnd = cwnd + MSS</Action>
 				<Action>reset RTO timer</Action>
-				<Action>Send packets</Actions>
+				<Action>Send packets</Action>
 			</Actions>
 			<NextState>FastRecovery</NextState>
 		</Transition>
@@ -178,7 +178,7 @@
 				<Action>cwnd = 1</Action>
 				<Action>rto_timeout = rto_timeout*2</Action>
 				<Action>reset RTO timer</Action>
-				<Action>retransmit last unacked packet</Actions>
+				<Action>retransmit last unacked packet</Action>
 			</Actions>
 			<NextState>ExponentialBackoff</NextState>
 		</Transition>
@@ -205,7 +205,7 @@
 				<Action>cwnd = 1</Action>
 				<Action>rto_timeout = rto_timeout*2</Action>
 				<Action>reset RTO timer</Action>
-				<Action>retransmit last unacked packet</Actions>
+				<Action>retransmit last unacked packet</Action>
 			</Actions>
 			<NextState>ExponentialBackoff</NextState>
 		</Transition>
