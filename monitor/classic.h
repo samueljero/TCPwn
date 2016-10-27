@@ -19,6 +19,7 @@
 
 #define INT_TME 10
 #define INT_PKT 5
+#define INT_RTO 200
 #define MSEC2USEC 1000
 #define MSEC2NSEC 1000000
 
@@ -51,6 +52,7 @@ class Classic: public Algorithm {
 		bool urgent_event;
 		double prior_ratio;
 		struct timeval last_packet;
+		struct timeval prior_packet;
 		struct timeval last_idle;
 		pthread_mutex_t time_lock;
 		timer_t pkt_timr;

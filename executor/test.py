@@ -43,6 +43,7 @@ class CCTester:
         self.last_result = 0
         self.last_transfer = 0
         self.last_termination_idle = False
+        self.return_code_error = False
         self.do_capture = config.do_capture
         self.last_cap = ""
         self.monitor_running = False
@@ -163,7 +164,7 @@ class CCTester:
             self._stop_proxy(proxy)
             self._stop_monitor(monitor)
             return (False, "System Failure")
-        if self.last_transfer < (config.transfer_size * config.transfer_multiple) and self.last_termination_idle and self.last_result < config.max_time*0.9:
+        if self.last_transfer < (config.transfer_size * config.transfer_multiple) and  self.last_result < config.max_time*0.9 and (self.last_termination_idle or self.return_code_error):
             result[0] = False
             result[1] = "Stalled Connection"
         else:
@@ -409,11 +410,14 @@ class CCTester:
             time.sleep(1)
 
         #Check Main Return code
+        self.return_code_error = False
         ret = main.wait_for_result()
         if ret.return_code is not 0:
             self.log.write("Main Traffic Command Failed! Return Code: %d\n" % (ret.return_code))
             print "Main Traffic Command Failed! Return Code: %d" % (ret.return_code)
             speed = config.max_time
+        if ret.return_code is 56:
+            self.return_code_error = True
         self.log.write("Main Traffic command output: \n" + ret.stderr_output)
 
         #Check Background Return code
@@ -422,6 +426,8 @@ class CCTester:
             self.log.write("Background Traffic Command Failed! Return Code: %d\n" % (ret.return_code))
             print "Background Traffic Command Failed! Return Code: %d" % (ret.return_code)
             bspeed = config.max_time
+        if ret.return_code is 56:
+            self.return_code_error = True
         self.log.write("Background Traffic command output: \n" + ret.stderr_output)
 
         return True, speed

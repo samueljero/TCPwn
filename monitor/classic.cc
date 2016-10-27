@@ -12,8 +12,8 @@ using namespace std;
 static const char* const state_strings[] = {"STATE_UNKNOWN", "STATE_INIT", "STATE_SLOW_START", 
 						"STATE_CONG_AVOID", "STATE_FAST_RECOV", "STATE_RTO", "STATE_END"};
 
-struct timeval holding1;
-struct timeval holding2;
+struct timeval time_since_last_packet;
+struct timeval time_since_last_idle;
 
 Classic::Classic(Proto *p)
 {
@@ -66,6 +66,7 @@ void Classic::new_packet(pkt_info pk, Message hdr)
 		if (diff.tv_sec > 0 || diff.tv_usec > INT_PKT*MSEC2USEC) {
 			memcpy(&last_idle, &tm, sizeof(struct timeval));
 		} 
+		memcpy(&prior_packet, &last_packet, sizeof(struct timeval));
 		memcpy(&last_packet, &tm, sizeof(struct timeval));
 
 		/* Reset packet timer */
@@ -102,6 +103,7 @@ void Classic::processClassicCongestionControl()
 {
 	static int cond = 0;
 	double cur = 0;
+	struct timeval diff;
 
 	/* Don't do anything before connection is established */
 	if (p->isUnknown()) {
@@ -122,7 +124,6 @@ void Classic::processClassicCongestionControl()
 	}
 
 	if (p->DataPkts() == 0 && p->AckPkts() == 0) {
-		idle_periods++;
 		return;
 	}
 
@@ -135,8 +136,11 @@ void Classic::processClassicCongestionControl()
 		prior_ratio = cur;
 	}
 
+	/* Compute time since prior packet */
+	timersub(&last_packet, &prior_packet, &diff);
+
 	/* Determine state */
-	if (p->AckPkts() == 0 && p->DataPkts() > 0 && p->DataPkts() < 10 && idle_periods > 3) {
+	if (p->DataPkts() > 0 && (diff.tv_sec > 0 || diff.tv_usec > INT_RTO*MSEC2USEC)) {
 		old_state = state;
 		state = STATE_RTO;
 		printState(old_state, state);
@@ -183,7 +187,6 @@ void Classic::processClassicCongestionControl()
 	
 	prior_ratio = cur;
 	p->resetCtrs();
-	idle_periods = 0;
 	return;
 }
 
@@ -216,8 +219,9 @@ void Classic::printState(int oldstate, int state)
 	}
 
 	Tracker::get().sendState(state_strings[state], p->getIP1(), p->getIP2(), p->name());
-	dbgprintf(1, "[%s] state = %s, lp=%lu.%06lu, il=%lu.%06lu\n", timestamp(buf,40), state_strings[state], holding1.tv_sec, holding1.tv_usec, holding2.tv_sec, holding2.tv_usec);
-	}
+	dbgprintf(1, "[%s] state = %s, lp=%lu.%06lu, il=%lu.%06lu\n", timestamp(buf,40), state_strings[state], 
+		time_since_last_packet.tv_sec, time_since_last_packet.tv_usec, time_since_last_idle.tv_sec, time_since_last_idle.tv_usec);
+}
 
 /* Stupid pthreads/C++ glue*/
 void* Classic::thread_run(void* arg)
@@ -253,8 +257,8 @@ void Classic::run()
 		timersub(&tm,&last_packet,&diff_pkt);
 		timersub(&tm,&last_idle,&diff_idle);
 		pthread_mutex_unlock(&time_lock);
-		memcpy(&holding1,&diff_pkt,sizeof(struct timeval));
-		memcpy(&holding2,&diff_idle,sizeof(struct timeval));
+		memcpy(&time_since_last_packet,&diff_pkt,sizeof(struct timeval));
+		memcpy(&time_since_last_idle,&diff_idle,sizeof(struct timeval));
 
 		if ((diff_idle.tv_sec > 0 || diff_idle.tv_usec >= 4*INT_TME*MSEC2USEC) ||
 			(diff_pkt.tv_sec > 0 || diff_pkt.tv_usec >= INT_PKT*MSEC2USEC) || urgent_event) {
