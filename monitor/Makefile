@@ -3,7 +3,7 @@
 ###############################################################################
 CPP=g++
 CC=gcc
-CPPFLAGS=-O2 -Wall -Werror -Wextra -g
+CPPFLAGS=-fPIC -pie -O2 -Wall -Werror -Wextra -g
 
 BINARIES=monitor
 MONITOR_HEADERS=monitor.h iface.h proto.h algorithm.h classic.h tcp.h
@@ -18,5 +18,5 @@ clean:
 	rm -f $(BINARIES) *.o *~
         
 monitor: $(MONITOR_HEADERS) $(MONITOR_SRC)
-	$(CPP) -fPIE $(CPPFLAGS) $(MONITOR_SRC) -o monitor -lpthread -lrt
+	$(CPP) $(CPPFLAGS) $(MONITOR_SRC) -o monitor -lpthread -lrt
 

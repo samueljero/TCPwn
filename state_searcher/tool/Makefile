@@ -1,7 +1,7 @@
 
 CXX 	= g++
 INCLUDES = -I../include -I.
-CFLAGS 	= -g -Wall
+CFLAGS 	= -fPIC -pie -O2 -g -Wall -Werror
 
 TARGET 	= searcher
 SRCS = ../lib/graph.cpp ../lib/searcher.cpp main.cpp

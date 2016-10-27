@@ -24,6 +24,15 @@ static int seq_diff(uint32_t s1, uint32_t s2)
 #define SEQ_BEFOREQ(s1, s2) (s1 == s2 || seq_before(s1,s2))
 #define SEQ_AFTERQ(s1, s2) (s1 == s2 || !seq_before(s1,s2))
 
+
+static uint32_t seq_top(uint32_t seq, uint32_t ip_len, uint32_t header_len)
+{
+	if (ip_len - header_len == 0) {
+		return seq;
+	}
+	return seq + (ip_len - header_len) - 1;
+}
+
 TCP::TCP()
 {
 	this->tcp_data_pkts = 0;
@@ -105,6 +114,8 @@ void TCP::updateTCPVars(Message hdr)
 {
 	struct tcphdr *tcph;
 	tcph = (struct tcphdr*)hdr.buff;
+	uint32_t topseq;
+	int len;
 
 	/* Set State INIT on SYN */
 	if (tcph->th_flags & TH_SYN) {
@@ -136,11 +147,18 @@ void TCP::updateTCPVars(Message hdr)
 	}
 
 	if (tcp1_port == ntohs(tcph->th_sport)) {
-			if (tcp1_seq_high == 0 || SEQ_AFTER(ntohl(tcph->th_seq),(uint32_t)tcp1_seq_high)) {
-				if (tcp1_seq_high != 0 && hdr.len > tcph->th_off*4) {
+			topseq = seq_top(ntohl(tcph->th_seq),hdr.len,tcph->th_off*4);
+			len = hdr.len - tcph->th_off*4;
+			
+			if (tcp1_seq_high != 0 && SEQ_BEFORE(topseq, (uint32_t)tcp1_seq_high) && len > 0) {
+				tcp_retransmits++;
+			}
+
+			if (tcp1_seq_high == 0 || SEQ_AFTER(topseq,(uint32_t)tcp1_seq_high)) {
+				if (tcp1_seq_high != 0 && len > 0) {
 					tcp_data_bytes += (hdr.len - tcph->th_off*4);
 				}
-				tcp1_seq_high = ntohl(tcph->th_seq) + (hdr.len - tcph->th_off*4);
+				tcp1_seq_high = topseq;
 			}
 
 			if (hdr.len == tcph->th_off*4 && ntohl(tcph->th_ack) == tcp1_ack_high) {
@@ -153,16 +171,19 @@ void TCP::updateTCPVars(Message hdr)
 				}
 				tcp1_ack_high = ntohl(tcph->th_ack);
 			}
+	} else {
+			topseq = seq_top(ntohl(tcph->th_seq),hdr.len,tcph->th_off*4);
+			len = hdr.len - tcph->th_off*4;
 
-			if (SEQ_BEFORE(ntohl(tcph->th_seq), (uint32_t)tcp1_seq_high)) {
+			if (tcp2_seq_high != 0 && SEQ_BEFORE(topseq, (uint32_t)tcp2_seq_high) && len > 0) {
 				tcp_retransmits++;
 			}
-	} else {
-			if (tcp2_seq_high == 0 || SEQ_AFTER(ntohl(tcph->th_seq),(uint32_t)tcp2_seq_high)) {
-				if (tcp2_seq_high != 0 && hdr.len > tcph->th_off*4) {
-					tcp_data_bytes += (hdr.len - tcph->th_off*4);
+			
+			if (tcp2_seq_high == 0 || SEQ_AFTER(topseq,(uint32_t)tcp2_seq_high)) {
+				if (tcp2_seq_high != 0 && len > 0) {
+					tcp_data_bytes += len;
 				}
-				tcp2_seq_high = ntohl(tcph->th_seq);
+				tcp2_seq_high = topseq;
 			}
 			
 			if (hdr.len == tcph->th_off*4 && ntohl(tcph->th_ack) == tcp2_ack_high) {
@@ -174,10 +195,6 @@ void TCP::updateTCPVars(Message hdr)
 					tcp_ack_bytes += seq_diff(ntohl(tcph->th_ack),(uint32_t)tcp2_ack_high);
 				}
 				tcp2_ack_high = ntohl(tcph->th_ack);
-			}
-
-			if (SEQ_BEFORE(ntohl(tcph->th_seq), (uint32_t)tcp2_seq_high)) {
-				tcp_retransmits++;
 			}
 	}
 	return;

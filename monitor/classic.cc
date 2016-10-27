@@ -100,6 +100,7 @@ void Classic::triggerTimerNow()
 
 void Classic::processClassicCongestionControl() 
 {
+	static int cond = 0;
 	double cur = 0;
 
 	/* Don't do anything before connection is established */
@@ -129,6 +130,7 @@ void Classic::processClassicCongestionControl()
 	if (p->AckBytes() > 0) {
 		cur = p->DataBytes() / (p->AckBytes()*1.0);
 	}
+
 	if (prior_ratio == 0) {
 		prior_ratio = cur;
 	}
@@ -138,10 +140,12 @@ void Classic::processClassicCongestionControl()
 		old_state = state;
 		state = STATE_RTO;
 		printState(old_state, state);
+		cond  = 0;
 	} else if (state == STATE_FAST_RECOV && p->AckHoldsNotPassed()) {
 		old_state = state;
 		state = STATE_FAST_RECOV;
 		printState(old_state, state);
+		cond  = 0;
 	//} else if (cur < 0.8 && p->Retransmissions() > 0) {
 	} else if (p->Retransmissions() > 0 || (p->AckBytes() == 0 && p->AckPkts() > 3)) {
 		if (state != STATE_FAST_RECOV) {
@@ -150,21 +154,30 @@ void Classic::processClassicCongestionControl()
 		old_state = state;
 		state = STATE_FAST_RECOV;
 		printState(old_state, state);
+		cond  = 0;
 	//} else if (tcp_data_bytes > 1.8*tcp_ack_bytes) {
 	} else if ((cur+prior_ratio)/2 > 1.8) {
 		old_state = state;
 		state = STATE_SLOW_START;
 		printState(old_state, state);
+		cond  = 0;
 	//} else if (tcp_data_bytes > 0.8*tcp_ack_bytes) {
 	} else if ((cur+prior_ratio)/2 > 0.8) {
 		old_state = state;
 		state = STATE_CONG_AVOID;
 		printState(old_state, state);
+		cond  = 0;
+	} else if (state == STATE_RTO && cur < 0.1) {
+		p->resetCtrs();
 	} else {
-		//dbgprintf(0, "Cur: %e, Last: %e\n", cur, prior_ratio);
+		//We have no idea
+		//char buf[40];
+		//dbgprintf(0, "[%s] Holding. cur: %e, prior_ratio: %e, data: %u, acks: %u, cond: %i\n", timestamp(buf,40),cur, prior_ratio, p->DataBytes(), p->AckBytes(),cond);
 		if (cur != 0) {
-			prior_ratio = (cur + prior_ratio)/2;
+			prior_ratio = 0.8*cur + 0.2*prior_ratio;
 		}
+		if (cond) {} //cond is debug info
+		cond = 1;
 		return;
 	}
 	

@@ -3,7 +3,7 @@
 ###############################################################################
 CPP=g++
 CC=gcc
-CPPFLAGS=-O2 -Wall -Werror -Wextra -Wpedantic -g
+CPPFLAGS= -fPIC -pie -O2 -Wall -Werror -Wextra -Wpedantic -g
 
 BINARIES=proxy sndcmd
 PROXY_HEADERS=proxy.h control.h csv.h args.h iface.h checksums.h
