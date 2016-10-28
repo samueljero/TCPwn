@@ -745,6 +745,7 @@ Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject
 {
 	struct tcphdr *tcph;
 	tcp_half *tsrc;
+	Message datapk;
 
 	tcph = (struct tcphdr*)pk.buff;
 	tcph->th_sport = htons(src);
@@ -790,13 +791,29 @@ Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject
 	}
 	once = true;
 
-	tcph->th_sum = ipv4_pseudohdr_chksum((u_char*)pk.buff,sizeof(struct tcphdr),(u_char*)&ipdst,(u_char*)&ipsrc,6);
+	datapk = pk;
+	datapk.buff += sizeof(struct tcphdr);
+	datapk.len -= sizeof(struct tcphdr);
+	BuildData(datapk, info);
+
+	tcph->th_sum = ipv4_pseudohdr_chksum((u_char*)pk.buff,sizeof(struct tcphdr)+ info.data,(u_char*)&ipdst,(u_char*)&ipsrc,6);
 
 	ip_payload = pk;
-	ip_payload.len = sizeof(struct tcphdr);
+	ip_payload.len = sizeof(struct tcphdr) + info.data;
 
 	pk.buff += sizeof(struct tcphdr);
 	pk.len -= sizeof(struct tcphdr);
 
+	return pk;
+}
+
+Message TCPInject::BuildData(Message pk, inject_info &info)
+{
+	if (info.data > pk.len) {
+		return pk;
+	}
+	memset(pk.buff,0,info.data);
+	pk.buff += info.data;
+	pk.len -= info.data;
 	return pk;
 }

@@ -209,6 +209,7 @@ class TCPInject: public TCPModifier {
 		Message BuildEthHeader(Message pk, char* src, char* dst, int next);
 		Message BuildIPHeader(Message pk, uint32_t src, uint32_t dst, int next);
 		Message BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject_info &info, Message &ip_payload, uint32_t ipsrc, uint32_t ipdst);
+		Message BuildData(Message pk, inject_info &info);
 		static void* thread_run(void *arg);
 		void _run();
 

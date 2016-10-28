@@ -24,6 +24,7 @@ class inject_info {
 	unsigned long ack;
 	int freq;
 	int num;
+	int data;
 	int method;
 	enum direction dir;
 	unsigned long start;

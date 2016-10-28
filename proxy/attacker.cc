@@ -221,6 +221,12 @@ bool Attacker::addCommand(Message m, Message *resp)
 				info.type = targ->value.i;
 			}
 
+			info.data = 0;
+			targ = args_find(args, "data");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				info.data = targ->value.i;
+			}
+
 			targ = args_find(args, "win");
 			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
 				info.window = targ->value.i;
