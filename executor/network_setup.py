@@ -22,7 +22,7 @@ def do_network(cmd, num):
 			os.system("sudo tunctl -u {0} -t tap-n{1}-h{2}".format(user, str(num),str(i)))
 			os.system("sudo ifconfig tap-n{0}-h{1} 0.0.0.0 up".format(str(num),str(i)))
 			os.system("sudo brctl addif brhost tap-n{0}-h{1}".format(str(num),str(i)))
-			os.system("echo \"10.0.1.{:d} 00:00:00:01:00:{:02X}\" >> /tmp/ip-mac".format((num-1)*5+i+1,(num-1)*5+i+1))
+			os.system("echo \"10.0.1.{:d} 00:00:00:01:00:{:02X}\" >> /tmp/ip-mac".format((num-1)*6+i+1,(num-1)*6+i+1))
                 #Create Bridges
                 os.system("sudo brctl addbr br-n{0}-1".format(str(num)))
                 os.system("sudo brctl addbr br-n{0}-2".format(str(num)))
