@@ -32,7 +32,7 @@ class BruteForce(StrategyGenerator):
                 self.strat_lst.append(s)
                 for length in manipulations.length_full:
                     for start in manipulations.start_full:
-                        s = {'strat': [self._create_strat(src_ip, dst_ip, proto, start, start + length, "*", action, template, p)], 'priority': 0, 'retries': 0}
+                        s = {'strat': [self._create_strat(src_ip, dst_ip, proto, start, start + length, "*", action, template, p)], 'priority': 0, 'retries': 0, 'type':'OnPath'}
                         self.strat_lst.append(s)
 
         # Combinations of two
@@ -46,7 +46,7 @@ class BruteForce(StrategyGenerator):
                             for b_p in b_params:
                                 s = {'strat': [self._create_strat(src_ip, dst_ip, proto, a_start, a_start + manipulations.chunk_len, "*", a_action, a_template, a_p),
                                                self._create_strat(src_ip, dst_ip, proto, b_start, b_start + manipulations.chunk_len, "*", b_action, b_template, b_p)],
-                                     'priority': 0, 'retries': 0}
+                                     'priority': 0, 'retries': 0, 'type':'OnPath'}
                                 self.strat_lst.append(s)
 
         self.lg.write("[%s] Strategies: %d\n" % (str(datetime.today()), len(self.strat_lst)))
@@ -101,7 +101,7 @@ class StateBased(StrategyGenerator):
     def build_strategies(self):
         strategies = self.sm.createStrategies()
         for s in strategies:
-            d = {'strat':s, 'priority':0, 'retries':0}
+            d = {'strat':s['s'], 'priority':0, 'retries':0, 'type':s['t']}
             self.strat_lst.append(d)
         self.lg.write("[%s] Strategies: %d\n" % (str(datetime.today()), len(self.strat_lst)))
         print "[%s] Strategies: %d" % (str(datetime.today()), len(self.strat_lst))

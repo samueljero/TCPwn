@@ -215,12 +215,14 @@ class TCPInject: public TCPModifier {
 		inject_info info;
 		pkt_info pk;
 		Message msg;
+		bool once;
 		tcp_half* fwd;
 		tcp_half* rev;
 
 		pthread_t thread;
 		bool running;
 		bool thread_running;
+		bool has_run;
 		pthread_mutex_t timeout_mutex;
 };
 

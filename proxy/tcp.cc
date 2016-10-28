@@ -309,7 +309,7 @@ bool TCP::SetForceAck(unsigned long start, unsigned long stop, const char* state
 	
 	memset(&info,0,sizeof(inject_info));
 	info.dir = (enum direction)dir;
-	info.method = METHOD_ID_REL;
+	info.method = METHOD_ID_REL_ALL;
 	info.freq = 0;
 	info.num = 1;
 	info.ack = amt;

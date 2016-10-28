@@ -127,6 +127,7 @@ def handle_strat(result, ln_no, executor_files, capture_directory, out):
         cap = ""
         ttm = None
         tb = None
+        typ = ""
 
         #Components
         if 'result' in result:
@@ -135,6 +136,8 @@ def handle_strat(result, ln_no, executor_files, capture_directory, out):
             time = result['date']
         if 'strat' in result:
             strat = result['strat']['strat']
+            if 'type' in result['strat']
+                typ = result['strat']['type']
         if 'reason' in result:
             reason = result['reason']
         if 'capture' in result:
@@ -149,6 +152,7 @@ def handle_strat(result, ln_no, executor_files, capture_directory, out):
         print "Num: " + str(ln_no)
         for s in strat:
                 print "Strategy: " + s
+        print "Type: " + typ
         print "Time: " + time
         print "Result: " + res
         print "Reason: " + reason

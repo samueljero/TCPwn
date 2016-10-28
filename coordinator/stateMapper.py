@@ -21,24 +21,60 @@ class StateMapper():
     stateNameMap = {"SlowStart":"STATE_SLOW_START", "CongestionAvoidance":"STATE_CONG_AVOID", 
                         "FastRecovery":"STATE_FAST_RECOV", "ExponentialBackoff":"STATE_RTO"}
     actionMap = {
-        #Send current ACK. Also just wait for protocol
-        "ACK":[{'action':'FORCEACK','param':'amt=10&dir=1'},{'action':'FORCEACK','param':'amt=10&dir=2'},{}],
+        #Send any ACK
+        "ACK":[
+                {'action':'FORCEACK','param':'amt=10&dir=2','type':'OnPath'},
+                {'action':'FORCEACK','param':'amt=0&dir=2','type':'OnPath'},
+                {'action':'PREACK','param':'method=3&amt=1','type':'OnPath'},
+                {'action':'DIV','param':'bpc=100','type':'OnPath'},
+                {'type':'OnPath'}
+            ],
         #DUP Acks implemented with DUP action
-        "ACK && dup":[{'action':'DUP','param':'num=100'},{'action':'DUP','param':'num=4'},{'action':'LIMITACK','param':'*'},{}],
-        "ACK && dup && dupACKctr < 2":[{'action':'DUP','param':'num=1'}],
-        "ACK && dup && dupACKctr+1 == 3":[{'action':'DUP','param':'num=4'},{'action':'LIMITACK','param':'*'}],
-        #Send current ACK. Also just wait for protocol
-        "ACK && new":[{'action':'FORCEACK','param':'amt=10&dir=1'},{'action':'FORCEACK','param':'amt=10&dir=2'},{}],
-        #PREACK may help speed up exiting slow start. Maybe force loss to set ssthresh?
-        "ACK && new && cwnd + MSS >= ssthresh":[{'action':'PREACK','param':'method=3&amt=1'},{}],
-        #Nothing really to do. Force sending an ACK might help.
-        "ACK && new && cwnd+MSS < ssthresh":[{'action':'FORCEACK','param':'amt=10&dir=1'},{'action':'FORCEACK','param':'amt=10&dir=2'},{}],
-        #Use DIV ACKs to keep below high_water as long as possible
-        "ACK && new && pkt.ack < high_water":[{'action':'DIV', 'param':'bpc=100'}],
-        #PREACK may help speed up reaching high_water, but nothing we do can directly achieve this
-        "ACK && new && pkt.ack >= high_water":[{'action':'PREACK','param':'method=3&amt=1'},{}],
-        #BURST interrupts timing, making RTO likely. Also DROP packets
-        "RTO Timeout":[{'action':'BURST','param':'num=10'},{'action':'DROP','param':'p=80'},{'action':'LIMITACK','param':'*'}],
+        "ACK && dup":[
+                {'action':'FORCEACK','param':'amt=0&dir=2','type':'OnPath'},
+                {'action':'DUP','param':'num=100','type':'OnPath'},
+                {'action':'DUP','param':'num=4','type':'OnPath'},
+                {'action':'LIMITACK','param':'*','type':'OnPath'},
+                {'type':'OnPath'}
+            ],
+        "ACK && dup && dupACKctr < 2":[
+                {'action':'FORCEACK','param':'amt=0&dir=2','type':'OnPath'},
+                {'action':'DUP','param':'num=1','type':'OnPath'}
+            ],
+        "ACK && dup && dupACKctr+1 == 3":[
+                {'action':'DUP','param':'num=4','type':'OnPath'},
+                {'action':'LIMITACK','param':'*','type':'OnPath'}
+            ],
+        #New Acks, heavily use PREACK and DIV
+        "ACK && new":[
+                {'action':'FORCEACK','param':'amt=10&dir=2','type':'OnPath'},
+                {'action':'PREACK','param':'method=3&amt=1','type':'OnPath'},
+                {'action':'DIV','param':'bpc=100','type':'OnPath'},
+                {'type':'OnPath'}
+            ],
+        "ACK && new && cwnd + MSS >= ssthresh":[
+                {'action':'PREACK','param':'method=3&amt=1','type':'OnPath'},
+                {'action':'DIV','param':'bpc=100','type':'OnPath'},
+                {'type':'OnPath'}
+            ],
+        "ACK && new && cwnd+MSS < ssthresh":[
+                {'action':'FORCEACK','param':'amt=10&dir=2','type':'OnPath'},
+                {'type':'OnPath'}
+            ],
+        "ACK && new && pkt.ack < high_water":[
+                {'action':'DIV', 'param':'bpc=100','type':'OnPath'}
+            ],
+        "ACK && new && pkt.ack >= high_water":[
+                {'action':'PREACK','param':'method=3&amt=1','type':'OnPath'},
+                {'action':'DIV','param':'bpc=100','type':'OnPath'},
+                {'type':'OnPath'}
+            ],
+        #BURST interrupts timing, making RTO likely. Also DROP packets and prevent new Acking
+        "RTO Timeout":[
+                {'action':'BURST','param':'num=10','type':'OnPath'},
+                {'action':'DROP','param':'p=80','type':'OnPath'},
+                {'action':'LIMITACK','param':'*','type':'OnPath'}
+            ],
     }
 
     def __init__(self, lg, statemachinefile, searchterm):
@@ -89,29 +125,32 @@ class StateMapper():
     def _convertPaths(self):
         self.strategies = []
         for p in self.paths:
-            stratlist = []
-            states = []
-            for edge in p:
-                states.append([])
-            for i in range(0, len(states)):
+            components = {}
+            for i in range(0, len(p)):
                 state = self._mapState(p[i][0])
-                actions,parameters = self._findAction(state, p[i][1])
+                actions,parameters,types = self._findAction(state, p[i][1])
                 for j in range(0, len(actions)):
-                    states[i].append(self._formatStrategy(state,actions[j],parameters[j]))
-                self._buildStrats(states,0,[])
+                    if types[j] not in components:
+                        tmp = []
+                        for q in range(0, len(p)):
+                            tmp.append([])
+                        components[types[j]] = tmp
+                    components[types[j]][i].append(self._formatStrategy(state,actions[j],parameters[j]))
+            for t in components.keys():
+                self._buildStrats(components[t],0,[],t)
 
-    def _buildStrats(self, states, i, strat):
+    def _buildStrats(self, states, i, strat, strat_type):
         if i >= len(states):
             if len(strat) > 0:
-                self.strategies.append(strat)
+                self.strategies.append({'s':strat,'t':strat_type})
         else:
             for s in states[i]:
                 if len(s) == 0:
-                    self._buildStrats(states,i+1,strat)
+                    self._buildStrats(states,i+1,strat,strat_type)
                 else:
                     tmp = list(strat)
                     tmp.append(s)
-                    self._buildStrats(states,i+1,tmp)
+                    self._buildStrats(states,i+1,tmp,strat_type)
 
     def _mapState(self, st):
         if st in StateMapper.stateNameMap:
@@ -121,10 +160,11 @@ class StateMapper():
     def _findAction(self, state, conditions):
         actions = []
         parameters = []
+        types = []
         if conditions not in StateMapper.actionMap:
             print "[%s] Unknown Condition: %s" %(str(datetime.today()), conditions)
             self.log.write("[%s] Unknown Condition: %s\n" %(str(datetime.today()), conditions))
-            return actions,parameters
+            return actions,parameters,types
         val = StateMapper.actionMap[conditions]
         for v in val:
             if "action" in v:
@@ -135,7 +175,11 @@ class StateMapper():
                 parameters.append(v["param"])
             else:
                 parameters.append("")
-        return actions,parameters
+            if "type" in v:
+                types.append(v["type"])
+            else:
+                types.append("")
+        return actions,parameters,types
 
     def _formatStrategy(self, state, action, parameters):
         if len(action) == 0:

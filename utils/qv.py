@@ -44,12 +44,14 @@ def main(args):
             testresult = ""
             byte = ""
             time = ""
+            typ = ""
 
             if 'strat' in result:
                 strat = result['strat']
                 if 'strat' in strat:
                     strat = strat['strat']
-
+                if 'type' in strat:
+                    typ = strat['type']
             if 'date' in result:
                 timestamp = result['date']
             if 'reason' in result:
@@ -60,7 +62,7 @@ def main(args):
                 time = result['time']
 
 
-            lst = [timestamp,testresult,strat,time,byte]
+            lst = [timestamp,testresult,typ,strat,time,byte]
             print str(lst)
 
 

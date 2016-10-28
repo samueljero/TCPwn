@@ -47,7 +47,8 @@ using namespace std;
 #define PROTO_ALIAS_TCP			"TCP"
 
 #define METHOD_ALIAS_ABS		"ABS"
-#define METHOD_ALIAS_REL		"REL"
+#define METHOD_ALIAS_REL_ALL	"REL_ALL"
+#define METHOD_ALIAS_REL_ONCE	"REL_ONCE"
 
 #define IP_WILDCARD 0
 
@@ -214,6 +215,7 @@ bool Attacker::addCommand(Message m, Message *resp)
 				info.port_dst = targ->value.i;
 			}
 
+			info.type = -1;
 			targ = args_find(args, "type");
 			if (targ && targ-> type == ARG_VALUE_TYPE_INT) {
 				info.type = targ->value.i;
@@ -239,6 +241,11 @@ bool Attacker::addCommand(Message m, Message *resp)
 				info.freq = targ->value.i;
 			}
 
+			targ = args_find(args, "num");
+			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
+				info.num = targ->value.i;
+			}
+
 			targ = args_find(args, "dir");
 			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
 				if (targ->value.i == 1) {
@@ -260,6 +267,9 @@ bool Attacker::addCommand(Message m, Message *resp)
 			if (start == 0 && ( !info.mac_src || !info.mac_dst ||
 				info.port_src == 0 || info.port_dst == 0)) {
 				dbgprintf(0, "Adding INJECT Command: failed with bad arguments---start is zero and no addresses\n");
+				ret = false;
+			} else if (info.freq == 0 && info.num == 0){
+				dbgprintf(0, "Adding INJECT Command: failed with bad arguments---both freq and num not specified\n");
 				ret = false;
 			} else {
 				ret = obj->SetInject(start,stop,state,info);
@@ -536,7 +546,8 @@ int Attacker::normalize_method(char *s)
 	}
 
 	if (!strcmp(METHOD_ALIAS_ABS,s)) return METHOD_ID_ABS;
-	if (!strcmp(METHOD_ALIAS_REL,s)) return METHOD_ID_REL;
+	if (!strcmp(METHOD_ALIAS_REL_ALL,s)) return METHOD_ID_REL_ALL;
+	if (!strcmp(METHOD_ALIAS_REL_ONCE,s)) return METHOD_ID_REL_ONCE;
 	return METHOD_ID_ERR;
 }
 

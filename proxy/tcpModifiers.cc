@@ -466,10 +466,12 @@ TCPInject::TCPInject(unsigned long start, unsigned long stop, int state, inject_
 	info.start = start;
 	info.stop = stop;
 	info.state = state;
+	this->once = false;
 	this->fwd = NULL;
 	this->rev = NULL;
 	this->running = false;
 	this->thread_running = false;
+	this->has_run = false;
 	pthread_mutex_init(&this->timeout_mutex, NULL);
 	if (start == 0) {
 		Start();
@@ -484,8 +486,11 @@ TCPInject::~TCPInject()
 bool TCPInject::shouldApply(unsigned long pktnum, int state)
 {
 	bool ret = in_pkt_range(pktnum) && is_state(state);
-	if (!ret && this->running) {
-		Stop();
+	if (!ret) {
+		this->has_run = false;
+		if (this->running) {
+			Stop();
+		}
 	}
 	return ret;
 }
@@ -503,8 +508,9 @@ pkt_info TCPInject::apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old
 		rev = &src;
 	}
 
-	if (!this->running) {
+	if (!this->running && !this->has_run) {
 		Start();
+		this->has_run = true;
 	}
 
 	return pk;
@@ -514,14 +520,23 @@ bool TCPInject::Start()
 {
 	dbgprintf(1, "Start Injection\n");
 
-	/* Start thread */
-	running = true;
-	if (pthread_create(&thread, NULL, thread_run, this)<0) {
-		dbgprintf(0, "Error: Failed to start inject thread: %s\n", strerror(errno));
+	if (info.num == 1 || info.freq == 0) {
+		/* If we're just sending once, don't start a thread */
+		Stop();
+		running = true;
+		_run();
 		running = false;
-		return false;
+	} else {
+		/* Start thread */
+		Stop();
+		running = true;
+		if (pthread_create(&thread, NULL, thread_run, this)<0) {
+			dbgprintf(0, "Error: Failed to start inject thread: %s\n", strerror(errno));
+			running = false;
+			return false;
+		}
+		thread_running = true;
 	}
-	thread_running = true;
 	return true;
 }
 
@@ -545,6 +560,8 @@ void TCPInject::_run()
 	/* Mutex used only to sleep on */
 	pthread_mutex_lock(&timeout_mutex);
 
+	/* Reset once */
+	once = false;
 	
 	while(running) {
 		if (!BuildPacket(pk,msg,info)) {
@@ -734,7 +751,11 @@ Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject
 	tcph->th_dport = htons(dst);
 	tcph->th_x2 = 0;
 	tcph->th_off = 5;
-	tcph->th_flags = info.type;
+	if (info.type == -1) {
+		tcph->th_flags = TH_ACK;
+	} else {
+		tcph->th_flags = info.type;
+	}
 	tcph->th_sum = 0;
 	tcph->th_urp = 0;
 
@@ -744,7 +765,12 @@ Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject
 			tcph->th_ack = htonl(info.ack);
 			tcph->th_win = htons(info.window);
 			break;
-		case METHOD_ID_REL:
+		case METHOD_ID_REL_ONCE:
+			if (once) {
+				break;
+			}
+			/* else, intentional fall through */
+		case METHOD_ID_REL_ALL:
 			if (info.dir == FORWARD) {
 				tsrc = rev;
 			} else {
@@ -762,6 +788,7 @@ Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject
 			dbgprintf(0, "Error: Invalid Injection method!\n");
 			return pk;
 	}
+	once = true;
 
 	tcph->th_sum = ipv4_pseudohdr_chksum((u_char*)pk.buff,sizeof(struct tcphdr),(u_char*)&ipdst,(u_char*)&ipsrc,6);
 
