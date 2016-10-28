@@ -138,6 +138,7 @@ class TCPPreAck: public TCPModifier {
 	private:
 		int preack_amt;
 		int preack_method;
+		timeval last;
 };
 
 class TCPLimitAck: public TCPModifier {

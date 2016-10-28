@@ -57,6 +57,7 @@ TCPPreAck::TCPPreAck(unsigned long start, unsigned long stop, int state, int pre
 	this->state = state;
 	this->preack_amt = preack_amt;
 	this->preack_method = preack_method;
+	memset(&last,0,sizeof(timeval));
 }
 
 bool TCPPreAck::shouldApply(unsigned long pktnum, int state)
@@ -68,6 +69,7 @@ pkt_info TCPPreAck::apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old
 {
 	struct tcphdr *tcph;
 	uint32_t ack;
+	timeval diff;
 
 	if (old_src.port) {} /* Prevent unused warning */
 
@@ -120,6 +122,17 @@ pkt_info TCPPreAck::apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old
 			src.preack_save = dst.high_seq;
 		}
 	} else if (preack_method == 4) {
+		if (dst.have_initial_seq) {
+			tcph->th_ack = htonl(dst.high_seq + 1);
+
+			timersub(&pk.time,&last,&diff);
+			if (dst.high_seq == src.preack_save && diff.tv_sec == 0 && diff.tv_usec < 10*1000) {
+				return drop(pk);
+			}
+			src.preack_save = dst.high_seq;
+			memcpy(&last,&pk.time,sizeof(timeval));
+		}
+	} else if (preack_method == 5) {
 		/* Always Ack highest possible value */
 		if (dst.have_initial_seq) {
 			tcph->th_ack = htonl(dst.high_seq + 1);
