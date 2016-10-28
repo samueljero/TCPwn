@@ -27,9 +27,8 @@ static int seq_diff(uint32_t s1, uint32_t s2)
 
 static uint32_t seq_top(uint32_t seq, uint32_t ip_len, uint32_t header_len)
 {
-	if (ip_len - header_len == 0) {
-		return seq;
-	}
+	/* Yes, if the length is really zero, then the sequence number you want to
+	 * return is really one less than the header. */
 	return seq + (ip_len - header_len) - 1;
 }
 

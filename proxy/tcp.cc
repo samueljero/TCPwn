@@ -198,11 +198,8 @@ void TCP::update_conn_info(struct tcphdr *tcph, Message hdr, tcp_half &src)
 
 	/* Update sequence and ack numbers */
 	//TODO: How do we handle SACK?
-	if (src.have_initial_seq && SEQ_AFTERQ(ntohl(tcph->th_seq),src.high_seq) && !(tcph->th_flags & TH_SYN)) {
-		len = hdr.len - tcph->th_off*4;
-		if (len > 0) {
-			len--;
-		}
+	if (src.have_initial_seq && SEQ_AFTER(ntohl(tcph->th_seq),src.high_seq) && !(tcph->th_flags & TH_SYN)) {
+		len = hdr.len - tcph->th_off*4 - 1;
 		src.high_seq = ntohl(tcph->th_seq) + len;
 	}
 	if (src.have_initial_ack && (tcph->th_flags & TH_ACK) && SEQ_AFTERQ(ntohl(tcph->th_ack),src.high_ack)) {
