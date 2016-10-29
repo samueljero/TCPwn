@@ -520,15 +520,15 @@ bool TCPInject::Start()
 {
 	dbgprintf(1, "Start Injection\n");
 
-	if (info.num == 1 || info.freq == 0) {
+	//if (info.num == 1 || info.freq == 0) {
 		/* If we're just sending once, don't start a thread */
-		Stop();
-		running = true;
-		_run();
-		running = false;
-	} else {
+	//	Stop();
+	//	running = true;
+	//	_run();
+	//	running = false;
+	//} else {
 		/* Start thread */
-		Stop();
+	//	Stop();
 		running = true;
 		if (pthread_create(&thread, NULL, thread_run, this)<0) {
 			dbgprintf(0, "Error: Failed to start inject thread: %s\n", strerror(errno));
@@ -536,7 +536,7 @@ bool TCPInject::Start()
 			return false;
 		}
 		thread_running = true;
-	}
+	//}
 	return true;
 }
 
