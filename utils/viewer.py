@@ -136,7 +136,7 @@ def handle_strat(result, ln_no, executor_files, capture_directory, out):
             time = result['date']
         if 'strat' in result:
             strat = result['strat']['strat']
-            if 'type' in result['strat']
+            if 'type' in result['strat']:
                 typ = result['strat']['type']
         if 'reason' in result:
             reason = result['reason']
