@@ -695,11 +695,13 @@ bool TCPInject::BuildPacket(pkt_info &pk, Message &hdr, inject_info &info)
 	}
 
 	/* Allocate buffer*/
-	pk.msg.alloc = 1500;
-	pk.msg.len = pk.msg.alloc;
-	pk.msg.buff = (char*)malloc(pk.msg.alloc);
-	if (!pk.msg.buff) {
-		return false;
+	if (!pk.valid || !pk.msg.buff) {
+		pk.msg.alloc = 1500;
+		pk.msg.len = pk.msg.alloc;
+		pk.msg.buff = (char*)malloc(pk.msg.alloc);
+		if (!pk.msg.buff) {
+			return false;
+		}
 	}
 
 	/* Initialize packet_info */
@@ -818,6 +820,43 @@ Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject
 			tcph->th_seq = htonl(tsrc->high_seq + 1 + info.seq);
 			tcph->th_ack = htonl(tsrc->high_ack + info.ack);
 			tcph->th_win = htons(tsrc->window + info.window);
+			break;
+		case METHOD_ID_REL_INC:
+			if (fwd->active_end && info.dir == 2) {
+				tsrc = fwd;
+			} else if (!fwd->active_end && info.dir == 1) {
+				tsrc = fwd;
+			} else if (rev->active_end && info.dir == 2) {
+				tsrc = rev;
+			} else if (!rev->active_end && info.dir == 1) {
+				tsrc = rev;
+			} else {
+				tsrc = NULL;
+			}
+			if (!tsrc) {
+				dbgprintf(0, "Error: REL injection with NULL src!\n");
+				return pk;
+			}
+			
+			if (!once) {
+				tcph->th_seq = htonl(tsrc->high_seq + 1);
+				tcph->th_ack = htonl(tsrc->high_ack);
+				tcph->th_win = htons(tsrc->window);
+			} else {
+				uint32_t seq = ntohl(tcph->th_seq) + info.seq;
+				if (SEQ_AFTER((uint32_t)tsrc->high_seq, seq)) {
+					seq = tsrc->high_seq + 1;
+				}
+				tcph->th_seq = htonl(seq);
+
+				uint32_t ack = ntohl(tcph->th_ack) + info.ack;
+				if (SEQ_AFTER((uint32_t)tsrc->high_ack, ack)) {
+					ack = tsrc->high_ack;
+				}
+				tcph->th_ack = htonl(ack);
+				
+				tcph->th_win = htons(tsrc->window + info.window);
+			}
 			break;
 		default:
 			dbgprintf(0, "Error: Invalid Injection method!\n");

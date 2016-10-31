@@ -41,7 +41,8 @@
 #define METHOD_ID_ABS 0
 #define METHOD_ID_REL_ALL 1
 #define METHOD_ID_REL_ONCE 2
-#define METHOD_ID_MAX 2
+#define METHOD_ID_REL_INC 3
+#define METHOD_ID_MAX 3
 
 
 class Attacker{

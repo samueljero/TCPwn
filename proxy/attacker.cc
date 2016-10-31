@@ -49,6 +49,7 @@ using namespace std;
 #define METHOD_ALIAS_ABS		"ABS"
 #define METHOD_ALIAS_REL_ALL	"REL_ALL"
 #define METHOD_ALIAS_REL_ONCE	"REL_ONCE"
+#define METHOD_ALIAS_REL_INC	"REL_INC"
 
 #define IP_WILDCARD 0
 
@@ -560,6 +561,7 @@ int Attacker::normalize_method(char *s)
 	if (!strcmp(METHOD_ALIAS_ABS,s)) return METHOD_ID_ABS;
 	if (!strcmp(METHOD_ALIAS_REL_ALL,s)) return METHOD_ID_REL_ALL;
 	if (!strcmp(METHOD_ALIAS_REL_ONCE,s)) return METHOD_ID_REL_ONCE;
+	if (!strcmp(METHOD_ALIAS_REL_INC,s)) return METHOD_ID_REL_INC;
 	return METHOD_ID_ERR;
 }
 
