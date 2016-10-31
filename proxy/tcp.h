@@ -30,6 +30,7 @@ class tcp_half {
 
 	bool have_initial_seq;
 	bool have_initial_ack;
+	bool active_end;
 	
 	unsigned long initial_seq;
 	unsigned long initial_ack;

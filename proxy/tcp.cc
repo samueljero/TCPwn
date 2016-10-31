@@ -169,6 +169,13 @@ void TCP::init_conn_info(pkt_info pk, struct tcphdr *tcph, tcp_half &src, tcp_ha
 		memcpy(&src.mac, pk.mac_src,6);
 		memcpy(&dst.mac, pk.mac_dst,6);
 	}
+	if ((tcph->th_flags & TH_SYN) && !(tcph->th_flags & TH_ACK)) {
+		src.active_end = true;
+		dst.active_end = false;
+	} else {
+		dst.active_end = true;
+		src.active_end = false;
+	}
 
 	src.port = ntohs(tcph->th_sport);
 	dst.port = ntohs(tcph->th_dport);
@@ -308,7 +315,7 @@ bool TCP::SetForceAck(unsigned long start, unsigned long stop, const char* state
 	inject_info info;
 	
 	memset(&info,0,sizeof(inject_info));
-	info.dir = (enum direction)dir;
+	info.dir = dir;
 	info.method = METHOD_ID_REL_ALL;
 	info.freq = 0;
 	info.num = 1;

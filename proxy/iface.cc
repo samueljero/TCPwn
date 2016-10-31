@@ -199,9 +199,15 @@ void Iface::rcv_run()
 			/* No message to send */
 			continue;
 		}
+		if (!pk.snd) {
+			/* No interface to send on */
+			free(pk.msg.buff);
+			memset(&pk,0,sizeof(pkt_info));
+			continue;
+		}
 
 		/* Send message */
-		if(!other->sendm(pk.msg, true)) {
+		if(!pk.snd->sendm(pk.msg, true)) {
 			_stop();
 			break;
 		}

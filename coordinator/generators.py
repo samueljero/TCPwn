@@ -101,6 +101,8 @@ class StateBased(StrategyGenerator):
     def build_strategies(self):
         strategies = self.sm.createStrategies()
         for s in strategies:
+            if s['t'] != 'OnPath':
+                continue
             d = {'strat':s['s'], 'priority':0, 'retries':0, 'type':s['t']}
             self.strat_lst.append(d)
         self.lg.write("[%s] Strategies: %d\n" % (str(datetime.today()), len(self.strat_lst)))

@@ -26,7 +26,7 @@ class inject_info {
 	int num;
 	int data;
 	int method;
-	enum direction dir;
+	int dir;
 	unsigned long start;
 	unsigned long stop;
 	int state;

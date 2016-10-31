@@ -68,6 +68,7 @@ class Attacker{
 		int normalize_action_type(char *s);
 		int normalize_proto(char *s);
 		unsigned long normalize_time(char *s);
+		int normalize_from(char *s);
 		int normalize_method(char *s);
 		Proto* find_or_create_proto(uint32_t src, uint32_t dst, int proto);
 		Proto* find_proto(uint32_t src, uint32_t dst);

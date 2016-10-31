@@ -1,8 +1,12 @@
 /******************************************************************************
  * Author: Samuel Jero <sjero@purdue.edu>
  * TCP Congestion Control Proxy: TCP specific attack code
+ *
+ *
+ * For INJECT, dir=2 is packet FROM ACTIVE OPEN SIDE, dir=1 is packet FROM PASSIVE OPEN SIDE
  *****************************************************************************/
 #include "proxy.h"
+#include "iface.h"
 #include "tcp.h"
 #include "checksums.h"
 #include "attacker.h"
@@ -500,15 +504,16 @@ pkt_info TCPInject::apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old
 	if (hdr.buff) {} /* Prevent unused warning */
 	if (old_src.port) {} /* Prevent unused warning */
 
-	if (pk.dir == FORWARD) {
-		fwd = &src;
-		rev = &dst;
-	} else {
-		fwd = &dst;
-		rev = &src;
-	}
-
 	if (!this->running && !this->has_run) {
+
+		if (pk.dir == FORWARD) {
+			fwd = &src;
+			rev = &dst;
+		} else {
+			fwd = &dst;
+			rev = &src;
+		}
+
 		Start();
 		this->has_run = true;
 	}
@@ -518,17 +523,17 @@ pkt_info TCPInject::apply(pkt_info pk, Message hdr, tcp_half &src, tcp_half &old
 
 bool TCPInject::Start()
 {
-	dbgprintf(1, "Start Injection\n");
+	if (running || thread_running) {
+		return true;
+	}
 
-	//if (info.num == 1 || info.freq == 0) {
+	if (info.num == 1 || info.freq == 0) {
 		/* If we're just sending once, don't start a thread */
-	//	Stop();
-	//	running = true;
-	//	_run();
-	//	running = false;
-	//} else {
+	    running = true;
+		_run();
+		running = false;
+	} else {
 		/* Start thread */
-	//	Stop();
 		running = true;
 		if (pthread_create(&thread, NULL, thread_run, this)<0) {
 			dbgprintf(0, "Error: Failed to start inject thread: %s\n", strerror(errno));
@@ -536,7 +541,7 @@ bool TCPInject::Start()
 			return false;
 		}
 		thread_running = true;
-	//}
+	}
 	return true;
 }
 
@@ -556,12 +561,16 @@ void TCPInject::_run()
 	int sec;
 	int nsec;
 	int pkts = 0;
+	
+	dbgprintf(1, "Start Injection\n");
 
 	/* Mutex used only to sleep on */
 	pthread_mutex_lock(&timeout_mutex);
 
 	/* Reset once */
 	once = false;
+	pk.valid = false;
+	pk.msg.buff = NULL;
 	
 	while(running) {
 		if (!BuildPacket(pk,msg,info)) {
@@ -573,7 +582,7 @@ void TCPInject::_run()
 		pkts++;
 
 		/* Exit after having sent enough packets */
-		if(info.num > 0 && info.num >= pkts) {
+		if(info.num > 0 && info.num <= pkts) {
 			break;
 		}
 
@@ -591,6 +600,15 @@ void TCPInject::_run()
 
 		/* Sleep */
 		pthread_mutex_timedlock(&timeout_mutex, &time);
+	}
+	
+	/* Release sleep mutex */
+	/* Unlocking an unlocked mutex is undefined.
+	 * 	 * Do this instead. */
+	if (pthread_mutex_trylock(&timeout_mutex)) {
+		pthread_mutex_unlock(&timeout_mutex);
+	} else {
+		pthread_mutex_unlock(&timeout_mutex);
 	}
 
 	free(pk.msg.buff);
@@ -625,23 +643,27 @@ bool TCPInject::BuildPacket(pkt_info &pk, Message &hdr, inject_info &info)
 	uint16_t dst_port;
 	Message next;
 
+	if (info.method == METHOD_ID_REL_ONCE && once) {
+		return true;
+	}
+
 	/* Validate Addresses */
 	if (fwd && rev && fwd->ip != 0 && fwd->port != 0 && rev->ip != 0 && rev->port != 0) {
 		/* Already received pkts, can grab addresses */
-		if (info.dir == FORWARD) {
-			memcpy(src_mac,rev->mac,6);
-			memcpy(dst_mac,fwd->mac,6);
-			src_ip = rev->ip;
-			dst_ip = fwd->ip;
-			src_port = rev->port;
-			dst_port = fwd->port;
-		} else if (info.dir == BACKWARD) {
+		if ((fwd->active_end && info.dir == 2) || (!fwd->active_end && info.dir == 1)) {
 			memcpy(src_mac,fwd->mac,6);
 			memcpy(dst_mac,rev->mac,6);
 			src_ip = fwd->ip;
 			dst_ip = rev->ip;
 			src_port = fwd->port;
 			dst_port = rev->port;
+		} else if ((rev->active_end && info.dir == 2) || (!rev->active_end && info.dir == 1)) {
+			memcpy(src_mac,rev->mac,6);
+			memcpy(dst_mac,fwd->mac,6);
+			src_ip = rev->ip;
+			dst_ip = fwd->ip;
+			src_port = rev->port;
+			dst_port = fwd->port;
 		} else {
 			dbgprintf(0, "Error: Invalid direction\n");
 			return false;
@@ -653,7 +675,7 @@ bool TCPInject::BuildPacket(pkt_info &pk, Message &hdr, inject_info &info)
 			dbgprintf(0, "Error: Missing required injection addresses!\n");
 			return false;
 		}
-		if (info.dir != FORWARD && info.dir != BACKWARD) {
+		if (info.dir != 1 && info.dir != 2) {
 			dbgprintf(0, "Error: Invalid injection direction!\n");
 			return false;
 		}
@@ -686,12 +708,18 @@ bool TCPInject::BuildPacket(pkt_info &pk, Message &hdr, inject_info &info)
 	pk.ip_src = pk.ip_dst = NULL;
 	pk.mac_src = pk.mac_dst = NULL;
 	pk.rcv = NULL;
-	pk.dir = info.dir;
-	if (info.dir == FORWARD) {
+	if (fwd->active_end && info.dir == 2) {
+		pk.snd = GetBackwardInterface();
+	} else if (!fwd->active_end && info.dir == 1) {
+		pk.snd = GetBackwardInterface();
+	} else if (rev->active_end && info.dir == 2) {
+		pk.snd = GetForwardInterface();
+	} else if (!rev->active_end && info.dir == 1) {
 		pk.snd = GetForwardInterface();
 	} else {
-		pk.snd = GetBackwardInterface();
+		return false;
 	}
+	pk.dir = pk.snd->getDirection();
 
 	/* Create headers */
 	next = BuildEthHeader(pk.msg, src_mac, dst_mac, ETHERTYPE_IP);
@@ -772,16 +800,22 @@ Message TCPInject::BuildTCPHeader(Message pk, uint16_t src, uint16_t dst, inject
 			}
 			/* else, intentional fall through */
 		case METHOD_ID_REL_ALL:
-			if (info.dir == FORWARD) {
+			if (fwd->active_end && info.dir == 2) {
+				tsrc = fwd;
+			} else if (!fwd->active_end && info.dir == 1) {
+				tsrc = fwd;
+			} else if (rev->active_end && info.dir == 2) {
+				tsrc = rev;
+			} else if (!rev->active_end && info.dir == 1) {
 				tsrc = rev;
 			} else {
-				tsrc = fwd;
+				tsrc = NULL;
 			}
 			if (!tsrc) {
 				dbgprintf(0, "Error: REL injection with NULL src!\n");
 				return pk;
 			}
-			tcph->th_seq = htonl(tsrc->high_seq + info.seq);
+			tcph->th_seq = htonl(tsrc->high_seq + 1 + info.seq);
 			tcph->th_ack = htonl(tsrc->high_ack + info.ack);
 			tcph->th_win = htons(tsrc->window + info.window);
 			break;

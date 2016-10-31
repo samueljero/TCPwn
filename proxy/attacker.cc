@@ -252,17 +252,23 @@ bool Attacker::addCommand(Message m, Message *resp)
 				info.num = targ->value.i;
 			}
 
+			info.dir = 2;
 			targ = args_find(args, "dir");
 			if (targ && targ->type == ARG_VALUE_TYPE_INT) {
 				if (targ->value.i == 1) {
-					info.dir = FORWARD;
+					info.dir = 1;
 				} else if (targ->value.i == 2) {
-					info.dir = BACKWARD;
+					info.dir = 2;
 				} else {
 					dbgprintf(0, "Adding INJECT Command: failed with bad arguments---invalid direction\n");
 				}
-			} else {
-					dbgprintf(0, "Adding INJECT Command: failed with bad arguments---invalid direction\n");
+			}
+			targ = args_find(args, "from");
+			if (targ) {
+				info.dir = normalize_from(targ->value.s);
+				if (info.dir < 0) {
+					dbgprintf(0, "Adding INJECT Command: failed with bad arguments---invalid \"from\" argument\n");
+				}
 			}
 
 			targ = args_find(args, "method");
@@ -555,6 +561,20 @@ int Attacker::normalize_method(char *s)
 	if (!strcmp(METHOD_ALIAS_REL_ALL,s)) return METHOD_ID_REL_ALL;
 	if (!strcmp(METHOD_ALIAS_REL_ONCE,s)) return METHOD_ID_REL_ONCE;
 	return METHOD_ID_ERR;
+}
+
+int Attacker::normalize_from(char *s)
+{
+	int ret;
+	if (is_int(s)) {
+		ret = atoi(s);
+		if (ret < 1 || ret > 2) return -1;
+		return ret;
+	}
+
+	if (!strcmp("PASV",s)) return 1;
+	if (!strcmp("ACTV",s)) return 2;
+	return -1;
 }
 
 uint32_t Attacker::normalize_addr(char *s)
