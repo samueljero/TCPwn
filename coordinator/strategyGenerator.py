@@ -159,7 +159,7 @@ The CC Testing System
 %s
 %s
 """
-        msg = MIMEText(msg %(str(instance),strat,socket.gethostname(),str(datatime.today())))
+        msg = MIMEText(msg %(str(instance),strat,socket.gethostname(),str(datetime.today())))
         msg["Subject"] = "CC Testing: System Failure"
         msg["From"] = config.src_email_address
         msg["To"] = config.dst_email_address
