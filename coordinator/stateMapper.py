@@ -31,11 +31,10 @@ class StateMapper():
                 {'type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10&freq=1&ack=0','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10&freq=1&ack=3000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10&freq=1&ack=100','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=100','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=90000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=10000&freq=2&ack=90000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=90000','type':'OffPath'}
+                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=9000','type':'OffPath'},
+                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=90000','type':'OffPath'},
             ],
         #DUP Acks implemented with DUP action
         "ACK && dup":[
@@ -46,24 +45,22 @@ class StateMapper():
                 {'type':'OnPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10&freq=1&ack=0','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10&freq=1&ack=3000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10&freq=1&ack=90000','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10000&freq=2&ack=0','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10000&freq=2&ack=3000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10000&freq=2&ack=90000','type':'OffPath'}
+                {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10000&freq=2&ack=90000','type':'OffPath'},
             ],
         "ACK && dup && dupACKctr < 2":[
                 {'action':'FORCEACK','param':'amt=0&dir=2','type':'OnPath'},
                 {'action':'DUP','param':'num=1','type':'OnPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=2&freq=1&ack=0','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=2&freq=1&ack=3000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=2&freq=1&ack=90000','type':'OffPath'}
+                {'type':'OffPath'},
             ],
         "ACK && dup && dupACKctr+1 == 3":[
                 {'action':'DUP','param':'num=4','type':'OnPath'},
                 {'action':'LIMITACK','param':'*','type':'OnPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10&freq=1&ack=0','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10&freq=1&ack=3000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10&freq=1&ack=90000','type':'OffPath'}
+                {'action':'INJECT','param':'from=ACTV&method=REL_ONCE&num=10&freq=1&ack=90000','type':'OffPath'},
             ],
         #New Acks, heavily use PREACK and DIV
         "ACK && new":[
@@ -71,48 +68,40 @@ class StateMapper():
                 {'action':'PREACK','param':'method=3&amt=1','type':'OnPath'},
                 {'action':'DIV','param':'bpc=100','type':'OnPath'},
                 {'type':'OnPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10&freq=1&ack=100','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10&freq=1&ack=90000','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=100','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=90000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=10000&freq=2&ack=90000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=90000','type':'OffPath'}
+                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=9000','type':'OffPath'},
+                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=90000','type':'OffPath'},
             ],
         "ACK && new && cwnd + MSS >= ssthresh":[
                 {'action':'PREACK','param':'method=3&amt=1','type':'OnPath'},
                 {'action':'DIV','param':'bpc=100','type':'OnPath'},
                 {'type':'OnPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=0','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=100','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=90000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=10000&freq=2&ack=90000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=90000','type':'OffPath'}
+                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=9000','type':'OffPath'},
+                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=90000','type':'OffPath'},
             ],
         "ACK && new && cwnd+MSS < ssthresh":[
                 {'action':'FORCEACK','param':'amt=10&dir=2','type':'OnPath'},
                 {'type':'OnPath'},
                 {'type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10&freq=1&ack=100','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=0','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=100','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=90000','type':'OffPath'}
+                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=9000','type':'OffPath'},
             ],
         "ACK && new && pkt.ack < high_water":[
                 {'action':'DIV', 'param':'bpc=100','type':'OnPath'},
                 {'type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10&freq=1&ack=100','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=100','type':'OffPath'},
             ],
         "ACK && new && pkt.ack >= high_water":[
                 {'action':'PREACK','param':'method=3&amt=1','type':'OnPath'},
                 {'action':'DIV','param':'bpc=100','type':'OnPath'},
                 {'type':'OnPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10&freq=1&ack=100','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10&freq=1&ack=90000','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=100','type':'OffPath'},
                 {'action':'INJECT','param':'from=ACTV&method=REL_ALL&num=10000&freq=2&ack=90000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=10000&freq=2&ack=90000','type':'OffPath'},
-                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=90000','type':'OffPath'}
+                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=9000','type':'OffPath'},
+                {'action':'INJECT','param':'from=ACTV&method=REL_INC&num=50000&freq=1&ack=90000','type':'OffPath'},
             ],
         #BURST interrupts timing, making RTO likely. Also DROP packets and prevent new Acking
         "RTO Timeout":[
@@ -121,7 +110,6 @@ class StateMapper():
                 {'action':'LIMITACK','param':'*','type':'OnPath'},
                 {'type':'OffPath'},
                 {'action':['INJECT','INJECT'],'param':['from=ACTV&method=REL_ALL&num=1&data=10','from=PASV&method=REL_ALL&num=1&data=10'],'type':'OffPath'},
-                {'action':['INJECT','INJECT'],'param':['from=ACTV&method=REL_ALL&num=1&data=1000','from=PASV&method=REL_ALL&num=1&data=1000'],'type':'OffPath'},
             ],
     }
 
@@ -135,6 +123,7 @@ class StateMapper():
     def createStrategies(self):
         self._findPaths()
         self._convertPaths()
+        self._dedupStrats()
         return self.strategies
 
     def _findPaths(self):
@@ -202,6 +191,13 @@ class StateMapper():
                     else:
                         tmp.append(s)
                     self._buildStrats(states,i+1,tmp,strat_type)
+
+    def _dedupStrats(self):
+        d = {}
+        for s in self.strategies:
+            if str(s) not in d:
+                d[str(s)] = s
+        self.strategies = d.values()
 
     def _mapState(self, st):
         if st in StateMapper.stateNameMap:

@@ -6,9 +6,11 @@ import sys
 import os
 import re
 import argparse
+import pprint
 
 
 def main(args):
+        pp = pprint.PrettyPrinter()
 
         #Parse Args
         argp = argparse.ArgumentParser(description='Quick Results Viewer')
@@ -47,11 +49,13 @@ def main(args):
             typ = ""
 
             if 'strat' in result:
-                strat = result['strat']
-                if 'strat' in strat:
-                    strat = strat['strat']
-                if 'type' in strat:
-                    typ = strat['type']
+                rawstrat = result['strat']
+                if 'strat' in rawstrat:
+                    strat = rawstrat['strat']
+                else:
+                    strat = rawstrat
+                if 'type' in rawstrat:
+                    typ = rawstrat['type']
             if 'date' in result:
                 timestamp = result['date']
             if 'reason' in result:
@@ -63,7 +67,7 @@ def main(args):
 
 
             lst = [timestamp,testresult,typ,strat,time,byte]
-            print str(lst)
+            print pp.pformat(lst)
 
 
         return 0
