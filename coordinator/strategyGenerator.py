@@ -9,6 +9,7 @@ from datetime import datetime
 import pprint
 from email.mime.text import MIMEText
 import smtplib
+import socket
 
 system_home = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0]
 config_path = os.path.abspath(os.path.join(system_home, 'config'))
@@ -25,7 +26,9 @@ class StrategyGenerator:
         self.strat_lst = []
         self.proc_lst = []
         self.failed_lst = []
+        self.atk_lst = []
         self.strat_num = 0
+        self.emails = 0
 
     def next_strategy(self):
         # Check for new failed strategies that need to be retried
@@ -52,10 +55,10 @@ class StrategyGenerator:
     def return_strategy(self, strat):
         self.failed_lst.append(strat)
 
-    def strategy_result(self, strat, result, reason, feedback):
+    def strategy_result(self, strat, result, reason, feedback, instance):
         if result == False:
             if reason == "System Failure":
-                self._send_warning_email(strat)
+                self._send_warning_email(strat, instance)
             strat['retries'] += 1
             if strat['retries'] <= config.failed_retries:
                 self.lg.write("[%s] Strategy will be retried: %s\n" % (str(datetime.today()), str(strat)))
@@ -66,6 +69,7 @@ class StrategyGenerator:
                 dct = {'result':'FAILED', 'date':str(datetime.today()), 'strat':strat, 'reason':reason, 'capture':feedback['capture'], 'time':feedback['last'], 'bytes':feedback['bytes']}
                 self.results.write("%s\n" % (str(dct)))
                 self.results.flush()
+                self.atk_lst.append(dct)
                 self.lg.write("[%s] Strategy HARD FAILED: %s\n" % (str(datetime.today()), str(strat)))
                 print "[%s] Strategy HARD FAILED: %s" % (str(datetime.today()), str(strat))
         else:
@@ -90,11 +94,12 @@ class StrategyGenerator:
 
             # Create backup
             bkup = {}
-            bkup['version'] = 0
+            bkup['version'] = 1
             bkup['strat_lst'] = self.strat_lst
             bkup['proc_lst'] = self.proc_lst
             bkup['failed_lst'] = self.failed_lst
             bkup['strat_num'] = self.strat_num
+            bkup['atk_lst'] = self.atk_lst
 
             # Format
             pp = pprint.PrettyPrinter()
@@ -124,7 +129,7 @@ class StrategyGenerator:
             return False
 
         # Restore Backup
-        if bkup['version'] != 0:
+        if bkup['version'] != 1:
             print "Warning: Checkpoint is incompatable!!!"
             f.close()
             return False
@@ -132,26 +137,29 @@ class StrategyGenerator:
         self.proc_lst = bkup['proc_lst']
         self.strat_num = bkup['strat_num']
         self.failed_lst = bkup['failed_lst']
+        self.atk_lst = bkup['atk_lst']
 
         f.close()
         self.lg.write("[%s] Restore Finished\n" % (str(datetime.today())))
         print "[%s] Restore Finished" % (str(datetime.today()))
         return True
 
-    def _send_warning_email(self, strat):
-        if not config.email_on_system_fail:
+    def _send_warning_email(self, strat, instance):
+        self.emails += 1
+        if not config.email_on_system_fail or self.emails > 50:
             return
         msg = """Administrator,
-This message is to notify you that a strategy being tested by the Congestion Control
-testing system has failed and indicated that it was a System Failure. The strategy was:
-"""
-        msg += str(strat)
-        msg += """
+This message is to notify you that a System Failure occured in the Congestion Control
+Testing System on %s. Testing will continue, but you may want to investigate this closer.
+The strategy being tested at the time was:
+%s
 
 
 The CC Testing System
+%s
+%s
 """
-        msg = MIMEText(msg)
+        msg = MIMEText(msg %(str(instance),strat,socket.gethostname(),str(datatime.today())))
         msg["Subject"] = "CC Testing: System Failure"
         msg["From"] = config.src_email_address
         msg["To"] = config.dst_email_address
