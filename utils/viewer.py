@@ -118,6 +118,27 @@ def query_next():
                 else:
                         sys.stdout.write("Invalid Response. Try Again.\n")
 
+
+def automatic_analysis(result, time, strat, typ, reason, cap, ttm, tb):
+    #Only Automating OffPath right now
+    if typ != "OffPath":
+        return None
+
+    if "Stalled" in reason or "Slower" in reason:
+        for s in strat:
+            if "STATE_SLOW_START" in s and "REL_INC" in s and tb < 80*1024*1024 and not "ack=90000" in s:
+                return {'category':"TRUE_STALL", 'details':'Increment in SS, covering losses. Once SS ends, connection stalls. auto.'}
+            if "STATE_FAST_RECOV" in s and "REL_INC" in s and tb < 80*1024*1024:
+                return {'category':'TRUE_STALL', 'details': 'Increment in FR. Increment becomes too much and ACKs dont help leading to connection stall. auto.'}
+            if "STATE_FAST_RECOV" in s and "REL_" in s and not "data=" in s and tb < 80*1024*1024:
+                return {'category':'TRUE_STALL', 'details':'Acking data above loss in FR. Never retransmitted. Never recovers. auto.'}
+            if "PASV" in s and "data=" in s:
+                return {'category':'TRUE_DESYNC', 'details':'Desync. No recovery possible. auto.'}
+    return None
+
+
+
+
 def handle_strat(result, ln_no, executor_files, capture_directory, out):
         global prior_log_choice, prior_capture_choice, prior_term_choice, prior_raw_choice, prior_categorize_choice, term_type, opt_break
         res = "?"
@@ -160,6 +181,21 @@ def handle_strat(result, ln_no, executor_files, capture_directory, out):
             print "Transfer Time: " + str(ttm)
         if tb is not None:
             print "Transfer Bytes: " + str(tb)
+
+        #Try to automatically guess
+        pred = automatic_analysis(res,time,strat,typ,reason,cap,ttm,tb)
+        if pred is not None:
+            print ""
+            print "Automated Analysis:"
+            print "Category: " + pred['category']
+            print "Reason: " + pred['details']
+            if query_yes_no("Accept Analysis?",None):
+                result['category'] = pred['category']
+                result['details'] = pred['details']
+                result['capture'] = split(cap)[1]
+                out.write(repr(result)+"\n")
+                out.flush()
+                return
 
         #View Log
         if query_yes_no("View Log?", prior_log_choice):
