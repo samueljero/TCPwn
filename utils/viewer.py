@@ -130,8 +130,12 @@ def automatic_analysis(result, time, strat, typ, reason, cap, ttm, tb):
                 return {'category':"TRUE_STALL", 'details':'Increment in SS, covering losses. Once SS ends, connection stalls. auto.'}
             if "STATE_FAST_RECOV" in s and "REL_INC" in s and tb < 80*1024*1024:
                 return {'category':'TRUE_STALL', 'details': 'Increment in FR. Increment becomes too much and ACKs dont help leading to connection stall. auto.'}
-            if "STATE_FAST_RECOV" in s and "REL_" in s and not "data=" in s and tb < 80*1024*1024:
+            if "STATE_FAST_RECOV" in s and "REL_" in s and not "data=" in s and tb < 80*1024*1024 and ttm < 59:
                 return {'category':'TRUE_STALL', 'details':'Acking data above loss in FR. Never retransmitted. Never recovers. auto.'}
+	    if "STATE_FAST_RECOV" in s and "REL_" in s and not "data=" in s and tb > 8*1024*1024 and ttm > 59:
+                return {'category':'TRUE_SLOWER', 'details':'Dup Ack injection causing spurious retransmittions and FRs, slowing down connection.'}
+	    if "STATE_CONG_AVOID" in s and "REL_ONCE" in s and not "data=" in s  and tb > 80*1024*1024 and "Slower" in reason:
+		return {'category':'TRUE_SLOWER', 'details':'Dup Ack injection leading to repeated retransmissions and FRs and decreased throughput. auto.'}
             if "PASV" in s and "data=" in s:
                 return {'category':'TRUE_DESYNC', 'details':'Desync. No recovery possible. auto.'}
     return None
