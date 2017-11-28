@@ -52,8 +52,8 @@ coord_strategy_generation_state_machine_search = "cwnd"
 coord_checkpoint_file = system_home + "/logs/coord.ck"
 coord_log = system_home + "/logs/coord.log"
 coord_results_log = system_home + "/logs/results.log"
-email_on_system_fail = True
-dst_email_address = "samuel.jero@gmail.com"
+email_on_system_fail = False
+dst_email_address = ""
 src_email_address = "cctester@" + socket.getfqdn()
 
 #Test
