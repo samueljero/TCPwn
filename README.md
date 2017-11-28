@@ -53,7 +53,7 @@ Not required, but useful:
 		wget http://cs.purdue.edu/~sjero/tcpwn_vms.tar.gz
 		tar xf tcpwn_vms.tar.gz
 
-	 For reference, the username for all VMs is `root` and the password is `Gat11ng`
+	 For reference, the username for all VMs is `root` and the password is `Gat11ng`. They already have an SSH key installed to allow our testing system passwordless access.
 
 * Ensure private SSH Key for VMs has proper permissions:
 
@@ -67,10 +67,10 @@ Not required, but useful:
 
 * Choose a config file:
 
-	There is a different config file for each implementation. The VM's we provide are Ubuntu 11.10, so:
+	There is a different config file for each implementation. The VM's we provide are Ubuntu 14.04, so:
 
 		cd config
-		cp config.1110.py config.py
+		cp config.1404.py config.py
 
 At this point the system should be operational.
 
@@ -118,19 +118,19 @@ While the `inst*.log` files can contain interesting info about the test, I've fo
 
 ## Test Network Diagram
 
->10.0.1.1                                  10.0.1.6            10.0.1.3
->|                                          |                     |
->Client 1                                 Monitor --------- Server 1 (Target Implementation)
->(10.0.3.1)                            (eth1)  (eth2)      (10.0.3.3)
->            \                         /
->            br (eth1) Proxy  (eth2) br
->            /            |           \
->(10.0.3.2)               |           (10.0.3.4)
->Client 2                 |             Server 2
->|                        |                 |
->10.0.1.2                 |             10.0.1.4
->                         |
->                      10.0.1.5
+    10.0.1.1                                  10.0.1.6            10.0.1.3
+    |                                          |                     |
+    Client 1                                 Monitor --------- Server 1 (Target Implementation)
+    (10.0.3.1)                            (eth1)  (eth2)      (10.0.3.3)
+                \                         /
+                br (eth1) Proxy  (eth2) br
+                /            |           \
+    (10.0.3.2)               |           (10.0.3.4)
+    Client 2                 |             Server 2
+    |                        |                 |
+    10.0.1.2                 |             10.0.1.4
+                             |
+                          10.0.1.5
 
 Each VM may have up to three IP addresses:
 10.0.1.x which is connected to the host via the brhost bridge
