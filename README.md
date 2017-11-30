@@ -132,10 +132,10 @@ While the `inst*.log` files can contain interesting info about the test, I've fo
                              |
                           10.0.1.5
 
-Each VM may have up to three IP addresses:
-10.0.1.x which is connected to the host via the brhost bridge
-10.0.3.x (where x is between 1 and 4). This address is actually connected to the testing system.
-10.0.2.x this is a NATed address to the global internet. I find myself wanting to install software (gdb, etc) for debugging and its a pain to not have this configured by default.
+Each VM may have up to three IP addresses:  
+10.0.1.x which is connected to the host via the brhost bridge  
+10.0.3.x (where x is between 1 and 4). This address is actually connected to the testing system.  
+10.0.2.x this is a NATed address to the global internet. I find myself wanting to install software (gdb, etc) for debugging and its a pain to not have this configured by default.  
 
 Note that 10.0.1.x addresses are unique to each VM while 10.0.3.x addresses are repeated for each instance (i.e. both instance 1 and instance 2 will have hosts with address 10.0.3.1---since they are completely isolated from each other this isn't a problem. Those machines would have addresses 10.0.1.3 and 10.0.1.9, respectively from the host).
 
@@ -143,18 +143,19 @@ Note that 10.0.1.x addresses are unique to each VM while 10.0.3.x addresses are 
 
 ## FAQ
 
-Q)Sometimes I get this line "Main Traffic Command Failed! Return Code: XX", where XX is the return code.  
+**Q)Sometimes I get this line "Main Traffic Command Failed! Return Code: XX", where XX is the return code.**  
 A)If you are running actual tests that's nothing to be concerned about. The return code being referred to is from the `wget` command we use to generate the connection we are manipulating. If that connection doesn't complete or times out, then you'll see the return code message. This usually occurs because the strategy being tested caused our connection to stall or become extremely slow.
 
-Q)How can I access the VM console, if something goes wrong  
+**Q)How can I access the VM console, if something goes wrong**  
 A)Use VNC. However, VNC is tied to the localhost to prevent it from being reachable from the global internet with no password. As a result, I usually use SSH port forwarding.
 
-Q)Can I start VMs manually before the test  
+**Q)Can I start VMs manually before the test**  
 A)You start the VMs manually with `executor/manage_vms.py start <first_vm_num> <last_vm_num>`. If you then run `executor/run.py`, it will emit a warning when it tries to start the VMs and they are already running, but shouldn't fail or crash. It should continue with the testing. For most VMs it will check that they are up and continue just fine.
 
 ## Paper
 
 This system was published in:
+
 Samuel Jero, Endadul Hoque, David Choffnes, Alan Mislove, and Cristina Nita-Rotaru. **Automated Attack Discovery in TCP Congestion Control Using a Model-guided Approach**, Network and Distributed Systems Security Symposium (NDSS), February 2018.
 
 Samuel Jero  
