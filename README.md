@@ -50,7 +50,8 @@ Not required, but useful:
 * Download the VMs:
 
 		cd vms/
-		wget http://cs.purdue.edu/~sjero/tcpwn_vms.tar.gz
+		wget http://www.cs.purdue.edu/~sjero/tcpwn_vms.tar.gz
+		(or http://sjero.net/ds2/tcpwn_vms.tar.gz)
 		tar xf tcpwn_vms.tar.gz
 
 	 For reference, the username for all VMs is `root` and the password is `Gat11ng`. They already have an SSH key installed to allow our testing system passwordless access.
