@@ -77,7 +77,7 @@ Not required, but useful:
 
 * Choose a config file:
 
-  	There is a different config file for each implementation. The VM's we provide are Ubuntu 14.04, so:
+	There is a different config file for each implementation. The VM's we provide are Ubuntu 14.04, so:
 
 		cd config
 		cp config.1404.py config.py
