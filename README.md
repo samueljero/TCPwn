@@ -41,7 +41,7 @@ Not required, but useful:
 * Clone the code:
 
 		git clone https://github.com/samueljero/TCPwn.git
-   		cd TCPwn
+		cd TCPwn
 
 * Build Proxy, Monitor, and State Searcher:
 
@@ -54,7 +54,7 @@ Not required, but useful:
 		(or http://sjero.net/ds2/tcpwn_vms.tar.gz)
 		tar xf tcpwn_vms.tar.gz
 
-	For reference, the username for all VMs is `root` and the password is `Gat11ng`. They already have an SSH key installed to allow our testing system passwordless access.
+		For reference, the username for all VMs is `root` and the password is `Gat11ng`. They already have an SSH key installed to allow our testing system passwordless access.
 
 * Ensure private SSH Key for VMs has proper permissions:
 
@@ -64,11 +64,11 @@ Not required, but useful:
 
 		./executor/network_setup.py start 1 1
 
-   This script creates entire test network instances. The numbers are the first and last instances to create.
+		This script creates entire test network instances. The numbers are the first and last instances to create.
 
 * (Build a DHCP server)
 
-   For people who do not have access to DHCP server in their network, they can build their own on the host.
+		For people who do not have access to DHCP server in their network, they can build their own on the host.
 
    1. install the DCHP server on the host 
    2. configure in order to make it listen to the interface 'brhost' in /etc/default/isc-dhcp-server
