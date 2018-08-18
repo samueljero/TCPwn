@@ -40,29 +40,29 @@ Not required, but useful:
 ## Installation
 * Clone the code:
 
-   git clone https://github.com/samueljero/TCPwn.git
-   	cd TCPwn
+		git clone https://github.com/samueljero/TCPwn.git
+   		cd TCPwn
 
 * Build Proxy, Monitor, and State Searcher:
 
-   make
+		make
 
 * Download the VMs:
 
-   cd vms/
-   	wget http://www.cs.purdue.edu/~sjero/tcpwn_vms.tar.gz
-   	(or http://sjero.net/ds2/tcpwn_vms.tar.gz)
-   	tar xf tcpwn_vms.tar.gz
+		cd vms/
+		wget http://www.cs.purdue.edu/~sjero/tcpwn_vms.tar.gz
+		(or http://sjero.net/ds2/tcpwn_vms.tar.gz)
+		tar xf tcpwn_vms.tar.gz
 
-    For reference, the username for all VMs is `root` and the password is `Gat11ng`. They already have an SSH key installed to allow our testing system passwordless access.
+	For reference, the username for all VMs is `root` and the password is `Gat11ng`. They already have an SSH key installed to allow our testing system passwordless access.
 
 * Ensure private SSH Key for VMs has proper permissions:
 
-   chmod 600 config/ssh.key
+		chmod 600 config/ssh.key
 
 * Configure the Virtual Network Environment:
 
-   ./executor/network_setup.py start 1 1
+		./executor/network_setup.py start 1 1
 
    This script creates entire test network instances. The numbers are the first and last instances to create.
 
@@ -79,8 +79,8 @@ Not required, but useful:
 
   There is a different config file for each implementation. The VM's we provide are Ubuntu 14.04, so:
 
-  	cd config
-  	cp config.1404.py config.py
+		cd config
+		cp config.1404.py config.py
 
 At this point the system should be operational.
 
