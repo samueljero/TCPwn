@@ -54,7 +54,7 @@ Not required, but useful:
 		(or http://sjero.net/ds2/tcpwn_vms.tar.gz)
 		tar xf tcpwn_vms.tar.gz
 
-		For reference, the username for all VMs is `root` and the password is `Gat11ng`. They already have an SSH key installed to allow our testing system passwordless access.
+	For reference, the username for all VMs is `root` and the password is `Gat11ng`. They already have an SSH key installed to allow our testing system passwordless access.
 
 * Ensure private SSH Key for VMs has proper permissions:
 
@@ -64,7 +64,7 @@ Not required, but useful:
 
 		./executor/network_setup.py start 1 1
 
-		This script creates entire test network instances. The numbers are the first and last instances to create.
+	This script creates entire test network instances. The numbers are the first and last instances to create.
 
 * (Build a DHCP server)
 
@@ -77,7 +77,7 @@ Not required, but useful:
 
 * Choose a config file:
 
-  There is a different config file for each implementation. The VM's we provide are Ubuntu 14.04, so:
+  	There is a different config file for each implementation. The VM's we provide are Ubuntu 14.04, so:
 
 		cd config
 		cp config.1404.py config.py
