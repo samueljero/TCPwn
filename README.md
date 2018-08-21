@@ -66,6 +66,15 @@ Not required, but useful:
 
 	This script creates entire test network instances. The numbers are the first and last instances to create.
 
+* (Build a DHCP server)
+
+		 For people who do not have access to DHCP server in their network, they can build their own on the host.
+
+   1. install the DCHP server on the host 
+   2. configure in order to make it listen to the interface 'brhost' in /etc/default/isc-dhcp-server
+   3. set the IP-MAC mapping in /etc/dhcp/dhcpd.conf
+   4. start the DHCP service
+
 * Choose a config file:
 
 	There is a different config file for each implementation. The VM's we provide are Ubuntu 14.04, so:
